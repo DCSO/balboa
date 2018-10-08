@@ -1,3 +1,8 @@
+/*
+   balboa
+   Copyright (c) 2018, DCSO GmbH
+*/
+
 #ifndef OBS_ROCKSDB_H
 #define OBS_ROCKSDB_H
 

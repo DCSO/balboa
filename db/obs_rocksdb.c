@@ -1,3 +1,8 @@
+/*
+   balboa
+   Copyright (c) 2018, DCSO GmbH
+*/
+
 #include "obs_rocksdb.h"
 
 #include <stdlib.h>
