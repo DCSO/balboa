@@ -1,0 +1,37 @@
+>>> /etc/packetbeat/packetbeat.yml
+----------------------------------
+
+packetbeat.interfaces.device: any
+
+packetbeat.protocols:
+- type: dns
+  ports: [53]
+  include_authorities: true
+  include_additionals: true
+
+output.logstash:
+  hosts: ["localhost:5044"]
+
+
+>>> /etc/logstash/conf.d/pdns.conf
+----------------------------------
+
+input {
+  beats {
+    port => 5044
+  }
+}
+
+filter {
+  mutate {
+    add_field => { "sensor_id" => "abcde" }
+  }
+}
+
+output {
+  http {
+    http_method => 'post'
+    url => 'http://localhost:8081/submit'
+    headers => ["X-Sensor-ID", "abcde"]
+  }
+}

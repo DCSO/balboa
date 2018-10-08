@@ -1,0 +1,66 @@
+CREATE KEYSPACE IF NOT EXISTS balboa WITH REPLICATION = { 
+   'class' : 'SimpleStrategy', 
+   'replication_factor' : 2 
+  };
+
+CREATE TABLE observations_by_rdata (
+    rrname text,
+    rdata text,
+    rrtype text,
+    sensor_id text,
+    first_seen timestamp,
+    last_seen timestamp,
+    PRIMARY KEY (rdata, rrname, rrtype, sensor_id)
+);
+CREATE CUSTOM INDEX ON observations_by_rdata (rrname) USING 'org.apache.cassandra.index.sasi.SASIIndex' WITH OPTIONS = { 
+   'analyzed' : 'true', 
+   'analyzer_class' : 'org.apache.cassandra.index.sasi.analyzer.NonTokenizingAnalyzer', 
+   'case_sensitive' : 'false', 
+   'mode' : 'CONTAINS' 
+}; 
+ALTER TABLE observations_by_rdata
+WITH COMPACTION = {'class': 'LeveledCompactionStrategy'};
+// UPDATE observations_by_rdata SET last_seen = toTimestamp(now()) where rrname = 'foo.bar' and rdata = '1.2.3.4' and rrtype='A' and sensor_id='abc' ;
+
+CREATE TABLE observations_by_rrname (
+    rrname text,
+    rdata text,
+    rrtype text,
+    sensor_id text,
+    first_seen timestamp,
+    last_seen timestamp,
+    PRIMARY KEY (rrname, rdata, rrtype, sensor_id)
+);
+CREATE CUSTOM INDEX ON observations_by_rrname (rdata) USING 'org.apache.cassandra.index.sasi.SASIIndex' WITH OPTIONS = { 
+   'analyzed' : 'true', 
+   'analyzer_class' : 'org.apache.cassandra.index.sasi.analyzer.NonTokenizingAnalyzer', 
+   'case_sensitive' : 'false', 
+   'mode' : 'CONTAINS' 
+};
+ALTER TABLE observations_by_rrname
+WITH COMPACTION = {'class': 'LeveledCompactionStrategy'};
+// UPDATE observations_by_rrname SET last_seen = toTimestamp(now()) where rrname = 'foo.bar' and rdata = '1.2.3.4' and rrtype='A' and sensor_id='abc' ;
+
+CREATE TABLE observations_counts (
+    rrname text,
+    rdata text,
+    rrtype text,
+    sensor_id text,
+    count counter,
+    PRIMARY KEY (rrname, rdata, rrtype, sensor_id)
+);
+ALTER TABLE observations_counts
+WITH COMPACTION = {'class': 'LeveledCompactionStrategy'}
+// update observations_counts  set count = count + 1 where rrname = 'foo.bar' and rdata = '1.2.3.4' and rrtype='A' and sensor_id='abc';
+
+CREATE TABLE observations_firstseen (
+    rrname text,
+    rdata text,
+    rrtype text,
+    sensor_id text,
+    first_seen timestamp,
+    PRIMARY KEY (rrname, rdata, rrtype, sensor_id)
+);
+ALTER TABLE observations_firstseen
+WITH COMPACTION = {'class': 'LeveledCompactionStrategy'}
+// insert into observations_firstseen  (first_seen, rrname, rdata, rrtype, sensor_id) values (toTimestamp(now()), 'foo.bar', '1.2.3.4', 'A', 'abc') if not exists ;

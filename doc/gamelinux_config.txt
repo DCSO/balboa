@@ -1,0 +1,15 @@
+input {
+  file {
+    path => "/var/log/passivedns.log"
+  }
+}
+
+output {
+    http {
+      http_method => 'post'
+      url => 'http://localhost:8081/submit'
+      format => "message"
+      message => "%{message}"
+      headers => ["X-Sensor-ID", "abcde"]
+    }
+}
