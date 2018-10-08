@@ -103,14 +103,16 @@ which would use the specified nodes to access the cluster. Only one database can
 All interaction with the service on the command line takes place via the `balboa` executable. The server can be started using:
 
 ```
-$ balboa serve
+$ balboa serve -l ''
+INFO[0000] Local RocksDB: memory budget empty, using default of 128MB
+INFO[0000] starting database Local RocksDB
 INFO[0000] opening database...
 INFO[0000] database ready
-INFO[0000] starting feeder AMQP Input
-INFO[0000] started janitor
+INFO[0000] starting feeder AMQPInput2
 INFO[0000] starting feeder HTTP Input
 INFO[0000] accepting submissions on port 8081
 INFO[0000] starting feeder Socket Input
+INFO[0000] starting feeder Suricata Socket Input
 INFO[0000] serving GraphQL on port 8080
 ```
 
