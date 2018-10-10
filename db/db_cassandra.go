@@ -26,11 +26,17 @@ const (
 
 // MakeCassandraDB returns a new CassandraDB instance connecting to the
 // provided hosts.
-func MakeCassandraDB(hosts []string) (*CassandraDB, error) {
+func MakeCassandraDB(hosts []string, username, password string) (*CassandraDB, error) {
 	var err error
 	cluster := gocql.NewCluster(hosts...)
 	cluster.Keyspace = "balboa"
 	cluster.Consistency = gocql.One
+	if len(username) > 0 && len(password) > 0 {
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: username,
+			Password: password,
+		}
+	}
 	log.Infof("connecting to hosts %v", hosts)
 	session, err := cluster.CreateSession()
 	if err != nil {
