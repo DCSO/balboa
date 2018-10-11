@@ -21,7 +21,9 @@ type Setup struct {
 		// for RocksDB
 		MemtableMemBudget uint64 `yaml:"membudget"`
 		// for Cassandra
-		Hosts []string `yaml:"hosts"`
+		Hosts    []string `yaml:"hosts"`
+		Username string   `yaml:"username"`
+		Password string   `yaml:"password"`
 	} `yaml:"database"`
 	LoadedDB DB
 }
@@ -69,7 +71,7 @@ func (s *Setup) Run() (DB, error) {
 			return nil, err
 		}
 	case "cassandra":
-		db, err = MakeCassandraDB(s.Database.Hosts)
+		db, err = MakeCassandraDB(s.Database.Hosts, s.Database.Username, s.Database.Password)
 		if err != nil {
 			return nil, err
 		}
