@@ -24,6 +24,7 @@ type Setup struct {
 		Hosts    []string `yaml:"hosts"`
 		Username string   `yaml:"username"`
 		Password string   `yaml:"password"`
+		Nworkers uint     `yaml:"nof_workers"`
 	} `yaml:"database"`
 	LoadedDB DB
 }
@@ -54,6 +55,10 @@ func LoadSetup(in []byte) (*Setup, error) {
 		if len(s.Database.Hosts) == 0 {
 			return nil, fmt.Errorf("%s: no Cassandra hosts defined", s.Database.Name)
 		}
+		if s.Database.Nworkers == 0 {
+			log.Infof("%s: number of workers is 0 or undefined, will use default of 32", s.Database.Name)
+			s.Database.Nworkers = 32
+		}
 	}
 	return &s, nil
 }
@@ -71,7 +76,7 @@ func (s *Setup) Run() (DB, error) {
 			return nil, err
 		}
 	case "cassandra":
-		db, err = MakeCassandraDB(s.Database.Hosts, s.Database.Username, s.Database.Password)
+		db, err = MakeCassandraDB(s.Database.Hosts, s.Database.Username, s.Database.Password, s.Database.Nworkers)
 		if err != nil {
 			return nil, err
 		}
