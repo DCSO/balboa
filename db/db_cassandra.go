@@ -10,7 +10,6 @@ import (
 
 	"github.com/gocql/gocql"
 	log "github.com/sirupsen/logrus"
-	"github.com/willfaught/gockle"
 )
 
 // CassandraDB is a DB implementation based on Apache Cassandra.
@@ -50,14 +49,14 @@ func MakeCassandraDB(hosts []string, username, password string, nofWorkers uint)
 	return db, nil
 }
 
-func makeCassandraDBMock() (*CassandraDB, *gockle.SessionMock) {
-	mock := &gockle.SessionMock{}
-	db := &CassandraDB{
-		//Session:  mock,
-		StopChan: make(chan bool),
-	}
-	return db, mock
-}
+//func makeCassandraDBMock() (*CassandraDB, *gockle.SessionMock) {
+//	mock := &gockle.SessionMock{}
+//	db := &CassandraDB{
+//		//Session:  mock,
+//		StopChan: make(chan bool),
+//	}
+//	return db, mock
+//}
 
 // AddObservation adds a single observation synchronously to the database.
 func (db *CassandraDB) AddObservation(obs observation.InputObservation) observation.Observation {
