@@ -13,6 +13,7 @@
 
 extern void cgoLogInfo(const char*);
 extern void cgoLogDebug(const char*);
+extern void cgoObsDump(Observation*);
 
 struct Error {
     char *msg;
@@ -305,7 +306,7 @@ static const char* obsdb_mergeop_name(void *state)
     return "observation mergeop";
 }
 
-ObsDB* obsdb_open(const char *path, size_t membudget, Error *e)
+static ObsDB* _obsdb_open(const char *path, size_t membudget, Error *e, bool readonly)
 {
     char *err = NULL;
     int level_compression[5] = {
@@ -331,7 +332,8 @@ ObsDB* obsdb_open(const char *path, size_t membudget, Error *e)
 
     db->options = rocksdb_options_create();
     rocksdb_options_increase_parallelism(db->options, 8);
-    rocksdb_options_optimize_level_style_compaction(db->options, membudget);
+    if (!readonly)
+        rocksdb_options_optimize_level_style_compaction(db->options, membudget);
     rocksdb_options_set_create_if_missing(db->options, 1);
     rocksdb_options_set_max_log_file_size(db->options, 10*1024*1024);
     rocksdb_options_set_keep_log_file_num(db->options, 2);
@@ -339,7 +341,10 @@ ObsDB* obsdb_open(const char *path, size_t membudget, Error *e)
     rocksdb_options_set_merge_operator(db->options, db->mergeop);
     rocksdb_options_set_compression_per_level(db->options, level_compression, 5);
 
-    db->db = rocksdb_open(db->options, path, &err);
+    if (!readonly)
+        db->db = rocksdb_open(db->options, path, &err);
+    else
+        db->db = rocksdb_open_for_read_only(db->options, path, 0, &err);
     if (err) {
         if (e)
             error_set(e, err);
@@ -353,6 +358,13 @@ ObsDB* obsdb_open(const char *path, size_t membudget, Error *e)
     return db;
 }
 
+ObsDB* obsdb_open(const char *path, size_t membudget, Error *e) {
+    return _obsdb_open(path, membudget, e, false);
+}
+
+ObsDB* obsdb_open_readonly(const char *path, Error *e) {
+    return _obsdb_open(path, 0, e, true);
+}
 
 int obsdb_put(ObsDB *db, Observation *obs, Error *e) 
 {
@@ -384,6 +396,47 @@ int obsdb_put(ObsDB *db, Observation *obs, Error *e)
         free(err);
         return -1;
     }
+
+    return 0;
+}
+
+int obsdb_dump(ObsDB *db, Error *e)
+{
+    rocksdb_iterator_t *it;
+    if (!db)
+        return -1;
+
+    it = rocksdb_create_iterator(db->db, db->readoptions);
+    for (rocksdb_iter_seek(it, "o", 1);
+         rocksdb_iter_valid(it) != (unsigned char) 0;
+         rocksdb_iter_next(it)) {
+        size_t size = 0;
+        int ret = 0;
+        Observation *o = NULL;
+        const char *rkey = NULL, *val = NULL;
+
+        rkey = rocksdb_iter_key(it, &size);
+        o = calloc(1, sizeof(Observation));
+        if (!o) {
+            return -1;
+        }
+        o->key = calloc(size + 1, sizeof(char));
+        if (!o->key) {
+            free(o);
+            return -1;
+        }
+        strncpy(o->key, rkey, size);
+        o->key[size] = '\0';
+        val = rocksdb_iter_value(it, &size);
+        ret = buf2obs(o, val, size);
+        if (ret != 0) {
+            fprintf(stderr, "error\n");
+        }
+        cgoObsDump(o);
+        free(o->key);
+        free(o);
+    }
+    rocksdb_iter_destroy(it);
 
     return 0;
 }

@@ -34,9 +34,12 @@ void               obs_set_delete(ObsSet*);
 typedef struct ObsDB ObsDB;
 
 ObsDB*        obsdb_open(const char *path, uint64_t membudget, Error*);
+ObsDB*        obsdb_open_readonly(const char *path, Error*);
 int           obsdb_put(ObsDB *db, Observation *obs, Error*);
 ObsSet*       obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname, 
-                         const char *qrrtype, const char *qsensorID);
+                           const char *qrrtype, const char *qsensorID);
+int           obsdb_dump(ObsDB *db, Error *e) ;
+
 unsigned long obsdb_num_keys(ObsDB*);
 void          obsdb_close(ObsDB*);
 
