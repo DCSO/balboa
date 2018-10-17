@@ -12,7 +12,7 @@ jobs:
       - checkout
       - run:
           name: Add stretch-backports
-          command: 'echo "deb http://ftp.debian.org/debian stretch-backports main" >> /etc/apt/sources.list.d/backports.list'
+          command: 'echo "deb http://ftp.debian.org/debian stretch-backports main" | sudo tee -a /etc/apt/sources.list.d/backports.list'
       - run:
           name: Install apt dependencies
           command: 'sudo apt-get update && sudo apt-get -t stretch-backports install librocksdb-dev libtpl-dev -y'
