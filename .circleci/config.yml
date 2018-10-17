@@ -12,7 +12,7 @@ jobs:
       - checkout
       - run:
           name: Install apt dependencies
-          command: 'sudo apt-get update && sudo apt-get install librocksdb-dev libtpl-dev -y'
+          command: 'sudo apt-get update && sudo apt-get -t stretch-backports install librocksdb-dev libtpl-dev -y'
 
       # specify any bash command here prefixed with `run: `
       - run: go get -v -t -d ./...
