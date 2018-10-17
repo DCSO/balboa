@@ -10,6 +10,7 @@ package db
 import "C"
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ func rocksMakeInvKey(sensor string, rrname string, rrtype string, rdata string) 
 	return k
 }
 
-// MakeRocksDB returns a nre RocksDB instance, storing data at the given dbPath.
+// MakeRocksDB returns a new RocksDB instance, storing data at the given dbPath.
 // The second parameter specifies a memory budget which determines the size of
 // memtables and caches.
 func MakeRocksDB(dbPath string, membudget uint64) (*RocksDB, error) {
@@ -51,6 +52,29 @@ func MakeRocksDB(dbPath string, membudget uint64) (*RocksDB, error) {
 	defer C.error_delete(e)
 	cdbPath := C.CString(dbPath)
 	cdb := C.obsdb_open(cdbPath, C.size_t(membudget), e)
+	defer C.free(unsafe.Pointer(cdbPath))
+
+	if C.error_is_set(e) {
+		return nil, fmt.Errorf("%s", C.GoString(C.error_get(e)))
+	}
+
+	db := &RocksDB{
+		db:       cdb,
+		stopChan: make(chan bool),
+	}
+
+	log.Info("database ready")
+	return db, nil
+}
+
+// MakeRocksDBReadonly returns a new read-only RocksDB instance.
+func MakeRocksDBReadonly(dbPath string) (*RocksDB, error) {
+	log.Info("opening database...")
+
+	e := C.error_new()
+	defer C.error_delete(e)
+	cdbPath := C.CString(dbPath)
+	cdb := C.obsdb_open_readonly(cdbPath, e)
 	defer C.free(unsafe.Pointer(cdbPath))
 
 	if C.error_is_set(e) {
@@ -238,6 +262,38 @@ func (db *RocksDB) Search(qrdata, qrrname, qrrtype, qsensorID *string) ([]observ
 	}
 
 	return outs, nil
+}
+
+//export cgoObsDump
+func cgoObsDump(o *C.Observation) {
+	valArr := strings.Split(C.GoString(o.key), keySepChar)
+	myObs := observation.Observation{
+		SensorID:  valArr[2],
+		Count:     int(o.count),
+		RData:     valArr[4],
+		RRName:    valArr[1],
+		RRType:    valArr[3],
+		FirstSeen: int(o.first_seen),
+		LastSeen:  int(o.last_seen),
+	}
+	js, err := json.Marshal(myObs)
+	if err == nil {
+		fmt.Println(string(js))
+	}
+}
+
+// Dump prints
+func (db *RocksDB) Dump() error {
+	e := C.error_new()
+	defer C.error_delete(e)
+
+	C.obsdb_dump(db.db, e)
+
+	if C.error_is_set(e) {
+		return fmt.Errorf("%s", C.GoString(C.error_get(e)))
+	}
+
+	return nil
 }
 
 // TotalCount returns the overall number of observations across all sensors.
