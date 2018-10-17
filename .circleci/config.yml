@@ -7,7 +7,7 @@ jobs:
     docker:
       - image: circleci/golang:1.10-stretch
 
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/DCSO/balboa
     steps:
       - checkout
       - run:
