@@ -282,7 +282,7 @@ func cgoObsDump(o *C.Observation) {
 	}
 }
 
-// Dump prints
+// Dump prints all aggregated observations in the database to stdout, in JSON format.
 func (db *RocksDB) Dump() error {
 	e := C.error_new()
 	defer C.error_delete(e)
