@@ -9,7 +9,7 @@ The balboa software...
 - is fast for queries and input/updates
 - implements persistent, compressed storage of observations
   - as local storage
-  - in a [Cassandra](https://cassandra.apache.org) cluster
+  - in a [Cassandra](https://cassandra.apache.org) cluster (experimental)
 - supports tracking and specifically querying multiple sensors
 - makes use of multi-core systems
 - can accept input from multiple sources simultaneously
@@ -35,13 +35,13 @@ $ go get github.com/DCSO/balboa
 Dependencies:
 
 - Go 1.7 or later
-- [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib)
+- [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
 - [tpl](https://troydhanson.github.io/tpl/index.html) (shared lib)
 
-On Debian (testing), one can satisfy these dependencies with:
+On Debian (testing and stretch-backports), one can satisfy these dependencies with:
 
 ```
-apt install librocksdb5.14 libtpl0
+apt install librocksdb-dev libtpl-dev
 ```
 
 ## Usage
@@ -78,7 +78,7 @@ All of these feeders accept input simultaneously, there is no distinction made a
 
 ### Configuring the database backend
 
-Multiple database backends are supported to store pDNS observations persistently. The one to use in a particular instance can be configured separately in another YAML file (to be passed via the `-d` parameter to `balboa serve`). For example, to use the RocksDB backend storing data in /tmp/balboa, one would specify:
+Multiple database backends are supported to store pDNS observations persistently. The one to use in a particular instance can be configured separately in another YAML file (to be passed via the `-d` parameter to `balboa serve`). For example, to use the RocksDB backend storing data in `/tmp/balboa`, one would specify:
 
 ```yaml
 database:
@@ -94,6 +94,8 @@ database:
     name: Cassandra cluster
     type: cassandra
     hosts: [ "127.0.0.1", "127.0.0.2", "127.0.0.3" ]
+    username: cassandra
+    password: cassandra
 ```
 
 which would use the specified nodes to access the cluster. Only one database can be configured at a time.
@@ -194,9 +196,64 @@ would return something like
 }
 ```
 
-This also works with `rdata` as the query parameter, but at least one of `rrname` or `rdata` must be stated. If there is no `sensor_id` parameter, then all results will be returned regardless of where the DNS answer was observed. 
+This also works with `rdata` as the query parameter, but at least one of `rrname` or `rdata` must be stated. If there is no `sensor_id` parameter, then all results will be returned regardless of where the DNS answer was observed. Use the `time_first_rfc3339` and `time_last_rfc3339` instead of `time_first` and `time_last`, respectively, to get human-readable timestamps.
 
-There is also some shortcut tool to make 'bulk' querying easier. For example, to get all the information on the hosts in range 1.2.0.0/16 as observed by sensor `abcde`, one can use:
+### Aliases
+
+Sometimes it is interesting to ask for all the domain names that resolve to the same IP address. For this reason, the GraphQL API supports a virtual `aliases` field that returns all Entries with RRType `A` or `AAAA` that share the same address in the Rdata field.
+
+Example:
+
+```graphql
+{
+  entries(rrname: "heise.de", rrtype: A) {
+    rrname
+    rdata
+    rrtype
+    time_first_rfc3339
+    time_last_rfc3339
+    aliases {
+      rrname
+      time_first_rfc3339
+      time_last_rfc3339
+    }
+  }
+}
+```
+
+```json
+{
+  "data": {
+    "entries": [
+      {
+        "rrname": "heise.de",
+        "rdata": "193.99.144.80",
+        "rrtype": "A",
+        "time_first_rfc3339": "2018-07-10T08:05:45Z",
+        "time_last_rfc3339": "2018-10-18T09:24:38Z",
+        "aliases": [
+          {
+            "rrname": "ct.de"
+          },
+          {
+            "rrname": "ix.de"
+          },
+          {
+            "rrname": "redirector.heise.de"
+          },
+          {
+            "rrname": "www.ix.de"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Bulk queries
+
+There is also a shortcut tool to make 'bulk' querying easier. For example, to get all the information on the hosts in range 1.2.0.0/16 as observed by sensor `abcde`, one can use:
 
 ```
 $ balboa query --sensor abcde 1.2.0.0/16
@@ -204,6 +261,10 @@ $ balboa query --sensor abcde 1.2.0.0/16
 {"count":1,"time_first":1531943215,"time_last":1531949530,"rrtype":"A","rrname":"baz.foobar.de","rdata":"1.2.3.7","sensor_id":"abcde"}
 ```
 Note that this tool currently only does a lot of concurrent individual queries! To improve performance in these cases it might be worthwhile to allow for range queries on the server side as well in the future.
+
+### Other tools
+
+Run `balboa` without arguments to list available subcommands and get a short description of what they do.
 
 ## Author/Contact
 
