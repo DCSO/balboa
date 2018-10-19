@@ -5,6 +5,7 @@ package db
 
 import (
 	"fmt"
+	"runtime"
 
 	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
@@ -56,8 +57,8 @@ func LoadSetup(in []byte) (*Setup, error) {
 			return nil, fmt.Errorf("%s: no Cassandra hosts defined", s.Database.Name)
 		}
 		if s.Database.Nworkers == 0 {
-			log.Infof("%s: number of workers is 0 or undefined, will use default of 32", s.Database.Name)
-			s.Database.Nworkers = 32
+			s.Database.Nworkers = (uint)(runtime.NumCPU() * 8)
+			log.Infof("%s: number of workers is 0 or undefined, will use default of %d", s.Database.Name, s.Database.Nworkers)
 		}
 	}
 	return &s, nil
