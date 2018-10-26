@@ -36,7 +36,8 @@ func MakeFeverAggregateInputObservations(inputJSON []byte, sensorID string, out 
 	var i int64
 	err := json.Unmarshal(inputJSON, &in)
 	if err != nil {
-		return err
+		log.Warn(err)
+		return nil
 	}
 	for k, v := range in.DNS {
 		select {

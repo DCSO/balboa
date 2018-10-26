@@ -41,13 +41,13 @@ func MakeGopassivednsInputObservations(inputJSON []byte, sensorID string, out ch
 	var in dnsLogEntry
 	err := json.Unmarshal(inputJSON, &in)
 	if err != nil {
-		log.Info(err)
-		return err
+		log.Warn(err)
+		return nil
 	}
 	tst, err := time.Parse("2006-01-02 15:04:05.999999 -0700 MST", in.Timestamp)
 	if err != nil {
 		log.Info(err)
-		return err
+		return nil
 	}
 	o := observation.InputObservation{
 		Count:          1,

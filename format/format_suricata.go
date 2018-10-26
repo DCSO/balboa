@@ -40,8 +40,8 @@ func MakeSuricataInputObservations(inputJSON []byte, sensorID string, out chan o
 	var i int
 	err := json.Unmarshal(inputJSON, &in)
 	if err != nil {
-		log.Info(err)
-		return err
+		log.Warn(err)
+		return nil
 	}
 	if in.EventType != "dns" {
 		return nil
@@ -51,8 +51,8 @@ func MakeSuricataInputObservations(inputJSON []byte, sensorID string, out chan o
 	}
 	tst, err := time.Parse("2006-01-02T15:04:05.999999-0700", in.Timestamp)
 	if err != nil {
-		log.Info(err)
-		return err
+		log.Warn(err)
+		return nil
 	}
 	if in.DNS.Version == 2 {
 		// v2 format
@@ -103,6 +103,6 @@ func MakeSuricataInputObservations(inputJSON []byte, sensorID string, out chan o
 		i++
 		out <- o
 	}
-	log.Debugf("enqueued %d observations", i)
+	log.Infof("enqueued %d observations", i)
 	return nil
 }

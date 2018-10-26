@@ -18,7 +18,6 @@ import (
 // input in the format as used by https://github.com/gamelinux/passivedns.
 func MakeFjellskaalInputObservations(inputJSON []byte, sensorID string, out chan observation.InputObservation, stop chan bool) error {
 	var i int
-	log.Info(string(inputJSON))
 	scanner := bufio.NewScanner(strings.NewReader(string(inputJSON)))
 	for scanner.Scan() {
 		select {
@@ -29,6 +28,7 @@ func MakeFjellskaalInputObservations(inputJSON []byte, sensorID string, out chan
 			if len(vals) == 9 {
 				times := strings.Split(vals[0], ".")
 				if len(times) != 2 {
+					log.Warn("timestamp does not have form X.X")
 					continue
 				}
 				epoch, err := strconv.Atoi(times[0])
@@ -61,6 +61,8 @@ func MakeFjellskaalInputObservations(inputJSON []byte, sensorID string, out chan
 				}
 				i++
 				out <- o
+			} else {
+				log.Warn("number of columns != 9")
 			}
 		}
 	}
