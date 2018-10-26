@@ -10,13 +10,14 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/DCSO/balboa/db"
+	"github.com/DCSO/balboa/observation"
+
 	graphql "github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/errors"
 	"github.com/graph-gophers/graphql-go/relay"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/DCSO/balboa/db"
-	"github.com/DCSO/balboa/observation"
 )
 
 const (
