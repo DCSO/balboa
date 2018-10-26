@@ -19,7 +19,7 @@ The balboa software...
   - Unix socket
 - accepts various (text-based) input formats
   - JSON-based
-      - FEVER
+      - [FEVER](https://github.com/DCSO/fever)
       - [gopassivedns](https://github.com/Phillipmartin/gopassivedns)
       - [Packetbeat](https://www.elastic.co/guide/en/beats/packetbeat/master/packetbeat-dns-options.html) (via Logstash)
       - [Suricata EVE DNS v1 and v2](http://suricata.readthedocs.io/en/latest/output/eve/eve-json-format.html#event-type-dns)
