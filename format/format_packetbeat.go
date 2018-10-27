@@ -35,16 +35,16 @@ func MakePacketbeatInputObservations(inputJSON []byte, sensorID string, out chan
 	var i int
 	err := json.Unmarshal(inputJSON, &in)
 	if err != nil {
-		log.Info(err)
-		return err
+		log.Warn(err)
+		return nil
 	}
 	if in.Type != "dns" {
 		return nil
 	}
 	tst, err := time.Parse("2006-01-02T15:04:05.999Z07", in.Timestamp)
 	if err != nil {
-		log.Info(err)
-		return err
+		log.Warn(err)
+		return nil
 	}
 	for _, answer := range in.DNS.Answers {
 		select {
@@ -64,6 +64,6 @@ func MakePacketbeatInputObservations(inputJSON []byte, sensorID string, out chan
 			out <- o
 		}
 	}
-	log.Debugf("enqueued %d observations", i)
+	log.Infof("enqueued %d observations", i)
 	return nil
 }

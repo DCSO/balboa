@@ -7,10 +7,11 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/DCSO/balboa/observation"
+
 	// imported for side effects
 	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
-	"github.com/DCSO/balboa/observation"
 )
 
 // create table observations (
