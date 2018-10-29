@@ -101,7 +101,7 @@ unsigned long obs_set_size(ObsSet *os)
 
 static void obs_set_add(ObsSet *os, Observation *o)
 {
-    if (!os)
+    if (!os || !os->os)
         return;
     if (os->used == os->size) {
         os->size *= 2;
