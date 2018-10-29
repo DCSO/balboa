@@ -485,6 +485,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
             if (!tokkey) {
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
+                free(prefix);
                 return NULL;
             }
                         
@@ -519,6 +520,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
             if (!o) {
                 free(tokkey);
                 obs_set_delete(os);
+                free(prefix);
                 return NULL;
             }
             o->key = calloc(size + 1, sizeof(char));
@@ -526,6 +528,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 free(o);
                 free(tokkey);
                 obs_set_delete(os);
+                free(prefix);
                 return NULL;
             }
             strncpy(o->key, rkey, size);
@@ -576,6 +579,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
             if (!tokkey) {
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
+                free(prefix);
                 return NULL;
             }
             
@@ -617,6 +621,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 free(tokkey);
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
+                free(prefix);
                 return NULL;
             }
             o->key = calloc(fullkeylen + 1, sizeof(char));
@@ -625,6 +630,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 free(tokkey);
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
+                free(prefix);
                 return NULL;
             }
             strncpy(o->key, fullkey, fullkeylen);
