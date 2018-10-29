@@ -106,8 +106,8 @@ static void obs_set_add(ObsSet *os, Observation *o)
     if (os->used == os->size) {
         os->size *= 2;
         os->os = realloc(os->os, (size_t) (os->size * sizeof(Observation*)));
-  }
-  os->os[os->used++] = o;
+    }
+    os->os[os->used++] = o;
 }
 
 const Observation* obs_set_get(ObsSet *os, unsigned long i) 
