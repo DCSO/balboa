@@ -126,7 +126,10 @@ void obs_set_delete(ObsSet *os)
     if (os->os != NULL) {
         unsigned long i = 0;
         for (i = 0; i < os->used; i++) {
-            free(os->os[i]->key);
+            if (os->os[i]->key)
+                free(os->os[i]->key);
+            if (os->os[i]->inv_key)
+                free(os->os[i]->inv_key);
             free(os->os[i]);
         }
         free(os->os);
