@@ -101,13 +101,13 @@ unsigned long obs_set_size(ObsSet *os)
 
 static void obs_set_add(ObsSet *os, Observation *o)
 {
-    if (!os)
+    if (!os || !os->os)
         return;
     if (os->used == os->size) {
         os->size *= 2;
         os->os = realloc(os->os, (size_t) (os->size * sizeof(Observation*)));
-  }
-  os->os[os->used++] = o;
+    }
+    os->os[os->used++] = o;
 }
 
 const Observation* obs_set_get(ObsSet *os, unsigned long i) 
@@ -126,7 +126,10 @@ void obs_set_delete(ObsSet *os)
     if (os->os != NULL) {
         unsigned long i = 0;
         for (i = 0; i < os->used; i++) {
-            free(os->os[i]->key);
+            if (os->os[i]->key)
+                free(os->os[i]->key);
+            if (os->os[i]->inv_key)
+                free(os->os[i]->inv_key);
             free(os->os[i]);
         }
         free(os->os);
@@ -485,6 +488,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
             if (!tokkey) {
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
+                free(prefix);
                 return NULL;
             }
                         
@@ -519,6 +523,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
             if (!o) {
                 free(tokkey);
                 obs_set_delete(os);
+                free(prefix);
                 return NULL;
             }
             o->key = calloc(size + 1, sizeof(char));
@@ -526,6 +531,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 free(o);
                 free(tokkey);
                 obs_set_delete(os);
+                free(prefix);
                 return NULL;
             }
             strncpy(o->key, rkey, size);
@@ -576,6 +582,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
             if (!tokkey) {
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
+                free(prefix);
                 return NULL;
             }
             
@@ -617,6 +624,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 free(tokkey);
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
+                free(prefix);
                 return NULL;
             }
             o->key = calloc(fullkeylen + 1, sizeof(char));
@@ -625,6 +633,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 free(tokkey);
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
+                free(prefix);
                 return NULL;
             }
             strncpy(o->key, fullkey, fullkeylen);
