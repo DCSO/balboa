@@ -72,7 +72,8 @@ const (
 	}
 	
 	# A single observation, unique for the combination of sensor, rrname, 
-	# rdata and rrtype. Corresponds, roughly, to a pDNS COF item.
+	# rdata and rrtype. Corresponds, roughly, to a pDNS COF item, but with
+	# additional Aliases (linked via IP in A/AAAA records).
 	type Entry {
 		# The number of observed occurrences of this observation.
 		count: Int!
@@ -103,7 +104,38 @@ const (
 
 		# Entries referencing the same IP (for A/AAAA) observed on the same
 		# sensor.
-		aliases: [Entry]
+		aliases: [LeafEntry]
+	}
+
+	# A single observation, unique for the combination of sensor, rrname,
+	# rdata and rrtype. Corresponds, roughly, to a pDNS COF item.
+	type LeafEntry {
+		# The number of observed occurrences of this observation.
+		count: Int!
+
+		# The RRName seen in this observation.
+		rrname: String!
+
+		# The RRType seen in this observation.
+		rrtype: RRType
+
+		# The RData seen in this observation.
+		rdata: String!
+
+		# Time this observation was first seen, as Unix timestamp.
+		time_first: Int!
+
+		# Time this observation was first seen, as RFC 3339 formatted time.
+		time_first_rfc3339: String!
+
+		# Time this observation was last seen, as Unix timestamp.
+		time_last: Int!
+
+		# Time this observation was last seen, as RFC 3339 formatted time.
+		time_last_rfc3339: String!
+
+		# Some identifier describing the source of this observation.
+		sensor_id: String
 	}
 
 	input EntryInput {
