@@ -374,8 +374,10 @@ func (r *EntryResolver) Aliases() *[]*EntryResolver {
 func (g *GraphQLFrontend) Run(port int) {
 	schema := graphql.MustParseSchema(txtSchema, &Resolver{})
 	g.Server = &http.Server{
-		Addr:    fmt.Sprintf(":%v", port),
-		Handler: &relay.Handler{Schema: schema},
+		Addr:         fmt.Sprintf(":%v", port),
+		Handler:      &relay.Handler{Schema: schema},
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 	log.Infof("serving GraphQL on port %v", port)
 	go func() {
