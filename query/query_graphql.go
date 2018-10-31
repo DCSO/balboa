@@ -219,6 +219,32 @@ func (r *Resolver) Entries(args struct {
 	Rrtype   *string
 	SensorID *string
 }) (*[]*EntryResolver, error) {
+	startTime := time.Now()
+	defer func() {
+		var rdata, rrname, rrtype, sensorID string
+		if args.Rdata != nil {
+			rdata = *args.Rdata
+		} else {
+			rdata = ("nil")
+		}
+		if args.Rrname != nil {
+			rrname = *args.Rrname
+		} else {
+			rrname = ("nil")
+		}
+		if args.Rrtype != nil {
+			rrtype = *args.Rrtype
+		} else {
+			rrtype = ("nil")
+		}
+		if args.SensorID != nil {
+			sensorID = *args.SensorID
+		} else {
+			sensorID = ("nil")
+		}
+		log.Debugf("finished query for (%s/%s/%s/%s) in %v", rdata, rrname, rrtype, sensorID, time.Since(startTime))
+	}()
+
 	l := make([]*EntryResolver, 0)
 	if args.Rdata == nil && args.Rrname == nil {
 		return nil, &errors.QueryError{
