@@ -15,6 +15,8 @@ extern void cgoLogInfo(const char*);
 extern void cgoLogDebug(const char*);
 extern void cgoObsDump(Observation*);
 
+#define OBS_SET_STEP_SIZE 1000
+
 struct Error {
     char *msg;
 };
@@ -104,7 +106,7 @@ static void obs_set_add(ObsSet *os, Observation *o)
     if (!os || !os->os)
         return;
     if (os->used == os->size) {
-        os->size *= 2;
+        os->size += OBS_SET_STEP_SIZE;
         os->os = realloc(os->os, (size_t) (os->size * sizeof(Observation*)));
     }
     os->os[os->used++] = o;
@@ -452,7 +454,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
     if (!db)
         return NULL;
 
-    os = obs_set_create(100); /* we rarely expect more than 100 hits */
+    os = obs_set_create(OBS_SET_STEP_SIZE);
 
     if (qrrname != NULL) {
         char *prefix = NULL;
