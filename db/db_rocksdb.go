@@ -307,6 +307,6 @@ func (db *RocksDB) TotalCount() (int, error) {
 // process both reads and writes.
 func (db *RocksDB) Shutdown() {
 	close(db.stopChan)
-	//C.obsdb_close(db.db)
+	C.obsdb_close(db.db)
 	log.Info("database closed")
 }

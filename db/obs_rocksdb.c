@@ -523,6 +523,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
             if (!o) {
                 free(tokkey);
                 obs_set_delete(os);
+                rocksdb_iter_destroy(it);
                 free(prefix);
                 return NULL;
             }
@@ -531,6 +532,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 free(o);
                 free(tokkey);
                 obs_set_delete(os);
+                rocksdb_iter_destroy(it);
                 free(prefix);
                 return NULL;
             }
@@ -573,7 +575,8 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
         for (; rocksdb_iter_valid(it) != (unsigned char) 0; rocksdb_iter_next(it)) {
             size_t size = 0, fullkeylen;
             int ret;
-            const char *rkey = rocksdb_iter_key(it, &size), *val = NULL;
+            const char *rkey = rocksdb_iter_key(it, &size);
+            char *val = NULL;
             char *rrname = NULL, *sensorID = NULL, *rrtype = NULL, *rdata = NULL, *saveptr;
             char fullkey[4096];
             char *err = NULL;
@@ -597,6 +600,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 tokkey = NULL;
                 break;
             }
+            cgoLogDebug(rdata);
             if (sensorID == NULL || (qsensorID != NULL && strcmp(qsensorID, sensorID) != 0)) {
                 free(tokkey);
                 tokkey = NULL;
@@ -618,6 +622,12 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
 
             fullkeylen = strlen(fullkey);
             val = rocksdb_get(db->db, db->readoptions, fullkey, fullkeylen, &size, &err);
+            if (err != NULL) {
+                cgoLogDebug("observation not found");
+                free(tokkey);
+                tokkey = NULL;
+                continue;
+            }
 
             o = calloc(1, sizeof(Observation));
             if (!o) {
@@ -625,6 +635,7 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
                 free(prefix);
+                free(val);
                 return NULL;
             }
             o->key = calloc(fullkeylen + 1, sizeof(char));
@@ -634,16 +645,17 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
                 obs_set_delete(os);
                 rocksdb_iter_destroy(it);
                 free(prefix);
+                free(val);
                 return NULL;
             }
             strncpy(o->key, fullkey, fullkeylen);
             o->key[fullkeylen] = '\0';
             ret = buf2obs(o, val, size);
-            printf("%d\n", ret);
             if (ret == 0) {
                 obs_set_add(os, o);
             }
             free(tokkey);
+            free(val);
             tokkey = NULL;
         }
         rocksdb_iter_destroy(it);
@@ -680,6 +692,6 @@ void obsdb_close(ObsDB *db)
     rocksdb_mergeoperator_destroy(db->mergeop);
     rocksdb_writeoptions_destroy(db->writeoptions);
     rocksdb_readoptions_destroy(db->readoptions);
-    rocksdb_options_destroy(db->options);
+    // rocksdb_options_destroy(db->options);
     rocksdb_close(db->db);
 }
