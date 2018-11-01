@@ -72,7 +72,8 @@ const (
 	}
 	
 	# A single observation, unique for the combination of sensor, rrname, 
-	# rdata and rrtype. Corresponds, roughly, to a pDNS COF item.
+	# rdata and rrtype. Corresponds, roughly, to a pDNS COF item, but with
+	# additional Aliases (linked via IP in A/AAAA records).
 	type Entry {
 		# The number of observed occurrences of this observation.
 		count: Int!
@@ -103,7 +104,38 @@ const (
 
 		# Entries referencing the same IP (for A/AAAA) observed on the same
 		# sensor.
-		aliases: [Entry]
+		aliases: [LeafEntry]
+	}
+
+	# A single observation, unique for the combination of sensor, rrname,
+	# rdata and rrtype. Corresponds, roughly, to a pDNS COF item.
+	type LeafEntry {
+		# The number of observed occurrences of this observation.
+		count: Int!
+
+		# The RRName seen in this observation.
+		rrname: String!
+
+		# The RRType seen in this observation.
+		rrtype: RRType
+
+		# The RData seen in this observation.
+		rdata: String!
+
+		# Time this observation was first seen, as Unix timestamp.
+		time_first: Int!
+
+		# Time this observation was first seen, as RFC 3339 formatted time.
+		time_first_rfc3339: String!
+
+		# Time this observation was last seen, as Unix timestamp.
+		time_last: Int!
+
+		# Time this observation was last seen, as RFC 3339 formatted time.
+		time_last_rfc3339: String!
+
+		# Some identifier describing the source of this observation.
+		sensor_id: String
 	}
 
 	input EntryInput {
@@ -187,6 +219,32 @@ func (r *Resolver) Entries(args struct {
 	Rrtype   *string
 	SensorID *string
 }) (*[]*EntryResolver, error) {
+	startTime := time.Now()
+	defer func() {
+		var rdata, rrname, rrtype, sensorID string
+		if args.Rdata != nil {
+			rdata = *args.Rdata
+		} else {
+			rdata = ("nil")
+		}
+		if args.Rrname != nil {
+			rrname = *args.Rrname
+		} else {
+			rrname = ("nil")
+		}
+		if args.Rrtype != nil {
+			rrtype = *args.Rrtype
+		} else {
+			rrtype = ("nil")
+		}
+		if args.SensorID != nil {
+			sensorID = *args.SensorID
+		} else {
+			sensorID = ("nil")
+		}
+		log.Debugf("finished query for (%s/%s/%s/%s) in %v", rdata, rrname, rrtype, sensorID, time.Since(startTime))
+	}()
+
 	l := make([]*EntryResolver, 0)
 	if args.Rdata == nil && args.Rrname == nil {
 		return nil, &errors.QueryError{
@@ -342,8 +400,10 @@ func (r *EntryResolver) Aliases() *[]*EntryResolver {
 func (g *GraphQLFrontend) Run(port int) {
 	schema := graphql.MustParseSchema(txtSchema, &Resolver{})
 	g.Server = &http.Server{
-		Addr:    fmt.Sprintf(":%v", port),
-		Handler: &relay.Handler{Schema: schema},
+		Addr:         fmt.Sprintf(":%v", port),
+		Handler:      &relay.Handler{Schema: schema},
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 	log.Infof("serving GraphQL on port %v", port)
 	go func() {
