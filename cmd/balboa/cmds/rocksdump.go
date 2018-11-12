@@ -12,7 +12,7 @@ import (
 var rocksdumpCmd = &cobra.Command{
 	Use:   "rocksdump [netmask]",
 	Short: "Dump information from RocksDB",
-	Long:  `This command allows directly dump bulk information from RocksDB.`,
+	Long:  `This command allows the user to directly dump bulk information from RocksDB.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 
