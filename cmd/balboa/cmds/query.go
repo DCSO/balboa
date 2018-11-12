@@ -59,7 +59,7 @@ func hosts(cidr string) ([]string, error) {
 var queryCmd = &cobra.Command{
 	Use:   "query [netmask]",
 	Short: "Obtain information from pDNS about IP ranges",
-	Long: `This command allows to query a balboa endpoint for information regarding
+	Long: `This command allows the user to query a balboa endpoint for information regarding
 IPs from a given range.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
