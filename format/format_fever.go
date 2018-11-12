@@ -30,7 +30,7 @@ type inputJSONstruct struct {
 }
 
 // MakeFeverAggregateInputObservations is a MakeObservationFunc that accepts
-// input in suristasher/FEVER's JSON format.
+// input in FEVER's JSON format.
 func MakeFeverAggregateInputObservations(inputJSON []byte, sensorID string, out chan observation.InputObservation, stop chan bool) error {
 	var in inputJSONstruct
 	var i int64
