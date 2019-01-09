@@ -1,4 +1,4 @@
-# balboa [![CircleCI](https://circleci.com/gh/DCSO/balboa.svg?style=svg)](https://circleci.com/gh/DCSO/balboa)
+# 📑 balboa [![CircleCI](https://circleci.com/gh/DCSO/balboa.svg?style=svg)](https://circleci.com/gh/DCSO/balboa)
 
 balboa is the BAsic Little Book Of Answers. It consumes and indexes observations from [passive DNS](https://www.farsightsecurity.com/technical/passive-dns/) collection, providing a [GraphQL](https://graphql.org/) interface to access the aggregated contents of the observations database. We built balboa to handle passive DNS data aggregated from metadata gathered by [Suricata](https://suricata-ids.org).
 
