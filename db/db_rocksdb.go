@@ -3,7 +3,7 @@
 
 package db
 
-// #cgo LDFLAGS: -lrocksdb -ltpl
+// #cgo LDFLAGS: -lrocksdb
 // #cgo CFLAGS: -O3 -Wno-implicit-function-declaration -Wall -Wextra -Wno-unused-parameter
 // #include "obs_rocksdb.h"
 // #include <stdlib.h>
