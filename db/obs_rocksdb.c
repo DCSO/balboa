@@ -505,20 +505,20 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
         size_t prefixlen = 0;
         if (qsensorID != NULL) {
             prefixlen = strlen(qsensorID) + strlen(qrrname) + 4;
-            prefix = calloc(prefixlen, sizeof(char));
+            prefix = calloc(prefixlen+1, sizeof(char));
             if (!prefix) {
                 obs_set_delete(os);
                 return NULL;
             }
-            (void) snprintf(prefix, prefixlen-1, "o\x1f%s\x1f%s\x1f", qrrname, qsensorID);
+            (void) snprintf(prefix, prefixlen, "o\x1f%s\x1f%s\x1f", qrrname, qsensorID);
         } else {
             prefixlen = strlen(qrrname) + 3;
-            prefix = calloc(prefixlen-1, sizeof(char));
+            prefix = calloc(prefixlen+1, sizeof(char));
             if (!prefix) {
                 obs_set_delete(os);
                 return NULL;
             }
-            (void) snprintf(prefix, prefixlen-1, "o\x1f%s\x1f", qrrname);
+            (void) snprintf(prefix, prefixlen, "o\x1f%s\x1f", qrrname);
         }
         cgoLogDebug(prefix);
 
@@ -599,20 +599,20 @@ ObsSet* obsdb_search(ObsDB *db, const char *qrdata, const char *qrrname,
         size_t prefixlen = 0;
         if (qsensorID != NULL) {
             prefixlen = strlen(qsensorID) + strlen(qrdata) + 4;
-            prefix = calloc(prefixlen, sizeof(char));
+            prefix = calloc(prefixlen+1, sizeof(char));
             if (!prefix) {
                 obs_set_delete(os);
                 return NULL;
             }
-            (void) snprintf(prefix, prefixlen-1, "i\x1f%s\x1f%s\x1f", qrdata, qsensorID);
+            (void) snprintf(prefix, prefixlen, "i\x1f%s\x1f%s\x1f", qrdata, qsensorID);
         } else {
             prefixlen = strlen(qrdata) + 3;
-            prefix = calloc(prefixlen, sizeof(char));
+            prefix = calloc(prefixlen+1, sizeof(char));
             if (!prefix) {
                 obs_set_delete(os);
                 return NULL;
             }
-            (void) snprintf(prefix, prefixlen-1, "i\x1f%s\x1f", qrdata);
+            (void) snprintf(prefix, prefixlen, "i\x1f%s\x1f", qrdata);
         }
         cgoLogDebug(prefix);
 
