@@ -36,7 +36,6 @@ Dependencies:
 
 - Go 1.7 or later
 - [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
-- [tpl](https://troydhanson.github.io/tpl/index.html) (shared lib)
 
 On Debian (testing and stretch-backports), one can satisfy these dependencies with:
 
