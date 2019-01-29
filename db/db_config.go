@@ -1,11 +1,10 @@
 // balboa
-// Copyright (c) 2018, DCSO GmbH
+// Copyright (c) 2018-2019, DCSO GmbH
 
 package db
 
 import (
 	"fmt"
-	"runtime"
 
 	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
@@ -17,7 +16,7 @@ type Setup struct {
 	Database struct {
 		Name string `yaml:"name"`
 		Type string `yaml:"type"`
-        HostAndPort string `yaml:"host"`
+		HostAndPort string `yaml:"host"`
 		// for local storage
 		DBPath string `yaml:"db_path"`
 		// for RocksDB
@@ -45,22 +44,6 @@ func LoadSetup(in []byte) (*Setup, error) {
 		return nil, fmt.Errorf("database type missing")
 	}
 	switch s.Database.Type {
-	case "rocksdb":
-		if len(s.Database.DBPath) == 0 {
-			return nil, fmt.Errorf("%s: local database path missing", s.Database.Name)
-		}
-		if s.Database.MemtableMemBudget == 0 {
-			log.Infof("%s: memory budget empty, using default of 128MB", s.Database.Name)
-			s.Database.MemtableMemBudget = 128 * 1024 * 1024
-		}
-	case "cassandra":
-		if len(s.Database.Hosts) == 0 {
-			return nil, fmt.Errorf("%s: no Cassandra hosts defined", s.Database.Name)
-		}
-		if s.Database.Nworkers == 0 {
-			s.Database.Nworkers = (uint)(runtime.NumCPU() * 8)
-			log.Infof("%s: number of workers is 0 or undefined, will use default of %d", s.Database.Name, s.Database.Nworkers)
-		}
 	case "remote-backend":
 		if len(s.Database.HostAndPort) == 0 {
 			return nil, fmt.Errorf("%s: no host defined",s.Database.Name)
@@ -76,16 +59,6 @@ func (s *Setup) Run() (DB, error) {
 	var db DB
 	var err error
 	switch s.Database.Type {
-	case "rocksdb":
-		db, err = MakeRocksDB(s.Database.DBPath, s.Database.MemtableMemBudget)
-		if err != nil {
-			return nil, err
-		}
-	case "cassandra":
-		db, err = MakeCassandraDB(s.Database.Hosts, s.Database.Username, s.Database.Password, s.Database.Nworkers)
-		if err != nil {
-			return nil, err
-		}
 	case "remote-backend":
 		db,err=MakeRemoteBackend(s.Database.HostAndPort)
 		if err!=nil {
