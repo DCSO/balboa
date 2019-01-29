@@ -1,7 +1,12 @@
 database:
-    name: Local RocksDB
-    type: rocksdb
-    db_path: /tmp/balboa
+    name: Remote Backend
+    type: remote-backend
+    host: "127.0.0.1:4242"
+
+#database:
+#    name: Local RocksDB
+#    type: rocksdb
+#    db_path: /tmp/balboa
 
 #database:
 #    name: Local Cassandra

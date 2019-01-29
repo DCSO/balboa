@@ -17,6 +17,7 @@ type Setup struct {
 	Database struct {
 		Name string `yaml:"name"`
 		Type string `yaml:"type"`
+        HostAndPort string `yaml:"host"`
 		// for local storage
 		DBPath string `yaml:"db_path"`
 		// for RocksDB
@@ -60,6 +61,10 @@ func LoadSetup(in []byte) (*Setup, error) {
 			s.Database.Nworkers = (uint)(runtime.NumCPU() * 8)
 			log.Infof("%s: number of workers is 0 or undefined, will use default of %d", s.Database.Name, s.Database.Nworkers)
 		}
+	case "remote-backend":
+		if len(s.Database.HostAndPort) == 0 {
+			return nil, fmt.Errorf("%s: no host defined",s.Database.Name)
+		}
 	}
 	return &s, nil
 }
@@ -80,6 +85,11 @@ func (s *Setup) Run() (DB, error) {
 		db, err = MakeCassandraDB(s.Database.Hosts, s.Database.Username, s.Database.Password, s.Database.Nworkers)
 		if err != nil {
 			return nil, err
+		}
+	case "remote-backend":
+		db,err=MakeRemoteBackend(s.Database.HostAndPort)
+		if err!=nil {
+			return nil,err
 		}
 	}
 	s.LoadedDB = db
