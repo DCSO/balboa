@@ -1,5 +1,5 @@
 // balboa
-// Copyright (c) 2018-2019, DCSO GmbH
+// Copyright (c) 2018, 2019, DCSO GmbH
 
 package db
 
