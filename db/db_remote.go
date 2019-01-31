@@ -106,19 +106,27 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 	h:=new(codec.MsgpackHandle)
 	enc:=codec.NewEncoder(w,h)
 	enc.Encode(makeQueryMessage(qry))
-	len,err_enc:=w.WriteTo(db.conn)
+	n,err_enc:=w.WriteTo(db.conn)
 	if err_enc!=nil {
 		enc.Reset(w)
 		return []observation.Observation{},err_enc
 	}
-	log.Debugf("sent %d bytes",len)
+	log.Debugf("sent %d bytes",n)
 	dec:=codec.NewDecoder(db.conn,h)
 	var result Result
 	err_dec:=dec.Decode(&result)
+	// local decode failed
 	if err_dec!=nil {
 		return []observation.Observation{},err_dec
 	}
-	return result.Observations,errors.New(result.Error)
+	// seems like a remote error occured
+	if result.Error!="" {
+		if len(result.Observations)>0 {
+			log.Warnf("discarding %v query results due to non-empty error message",len(result.Observations))
+		}
+		return []observation.Observation{},errors.New(result.Error)
+	}
+	return result.Observations,nil
 }
 
 func (db *RemoteBackend) TotalCount() (int,error) {
