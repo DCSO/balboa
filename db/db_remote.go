@@ -7,6 +7,7 @@ import (
 	"net"
 	"bytes"
 	"errors"
+
 	"github.com/DCSO/balboa/observation"
 
 	"github.com/ugorji/go/codec"
@@ -54,9 +55,11 @@ func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) obse
 	return observation.Observation{}
 }
 
+
 func (db *RemoteBackend) ConsumeFeed( inChan chan observation.InputObservation ) {
 	w:=new(bytes.Buffer)
 	h:=new(codec.MsgpackHandle)
+	h.WriteExt=true
 	enc:=codec.NewEncoder(w,h)
 	for {
 		select {
