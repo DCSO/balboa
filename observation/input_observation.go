@@ -11,7 +11,7 @@ import (
 // the minimal common input type for all consumers.
 type InputObservation struct {
 	Count          int
-	Rcode          string
+	Rcode          string 		`codec:"-"`
 	Rdata          string
 	Rrtype         string
 	Rrname         string
