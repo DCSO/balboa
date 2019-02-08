@@ -20,8 +20,8 @@ type RemoteBackend struct {
 }
 
 type Message struct {
-	Observations []observation.InputObservation
-	Queries []Query
+	Observations []observation.InputObservation `codec:"O"`
+	Queries []Query `codec:"Q"`
 }
 
 type Query struct {
@@ -30,8 +30,8 @@ type Query struct {
 }
 
 type Result struct {
-	Observations []observation.Observation
-	Error string
+	Observations []observation.Observation `codec:"O"`
+	Error string `codec:"E"`
 }
 
 func makeObservationMessage( obs observation.InputObservation ) *Message {
