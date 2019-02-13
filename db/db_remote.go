@@ -7,6 +7,7 @@ import (
 	"net"
 	"bytes"
 	"errors"
+	"time"
 
 	"github.com/DCSO/balboa/observation"
 
@@ -15,6 +16,7 @@ import (
 )
 
 type RemoteBackend struct {
+	host string
 	conn net.Conn
 	StopChan chan bool
 }
@@ -47,7 +49,7 @@ func MakeRemoteBackend( host string ) (*RemoteBackend,error) {
 	if err!=nil {
 		return nil,err
 	}
-	return &RemoteBackend{conn:conn,StopChan:make(chan bool)},nil
+	return &RemoteBackend{conn:conn,StopChan:make(chan bool),host:host},nil
 }
 
 func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) observation.Observation {
@@ -55,6 +57,27 @@ func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) obse
 	return observation.Observation{}
 }
 
+func (db *RemoteBackend) reconnect( ack chan bool ){
+	for {
+		log.Warnf("reconnecting to host=`%s`",db.host)
+		conn,err:=net.Dial("tcp",db.host)
+		if err==nil {
+			log.Warnf("reconnect successfull");
+			db.conn=conn
+			ack<-true
+			return
+		}
+		log.Warnf("reconnect failed: %s",err)
+		time.Sleep(10*time.Second)
+	}
+}
+
+func (db *RemoteBackend) waitForReconnect( ) bool {
+	ack:=make(chan bool)
+	go db.reconnect(ack)
+	ok:=<-ack
+	return ok
+}
 
 func (db *RemoteBackend) ConsumeFeed( inChan chan observation.InputObservation ) {
 	w:=new(bytes.Buffer)
@@ -78,7 +101,8 @@ func (db *RemoteBackend) ConsumeFeed( inChan chan observation.InputObservation )
 				if err!=nil {
 					log.Warnf("sending observation failed: %s",err)
 					enc.Reset(w)
-					return
+					reconnect_ok:=db.waitForReconnect()
+					if( !reconnect_ok ) { return }
 				}
 				enc.Reset(w)
 				log.Debugf("sent %d bytes",len)
