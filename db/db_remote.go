@@ -36,6 +36,8 @@ type Result struct {
 	Error string `codec:"E"`
 }
 
+var SleepTimeForReconnect=10*time.Second
+
 func makeObservationMessage( obs observation.InputObservation ) *Message {
 	return &Message{Observations:[]observation.InputObservation{obs},Queries:[]Query{}}
 }
@@ -68,7 +70,7 @@ func (db *RemoteBackend) reconnect( ack chan bool ){
 			return
 		}
 		log.Warnf("reconnect failed: %s",err)
-		time.Sleep(10*time.Second)
+		time.Sleep(SleepTimeForReconnect)
 	}
 }
 
@@ -82,29 +84,31 @@ func (db *RemoteBackend) waitForReconnect( ) bool {
 func (db *RemoteBackend) ConsumeFeed( inChan chan observation.InputObservation ) {
 	w:=new(bytes.Buffer)
 	h:=new(codec.MsgpackHandle)
+	h.ExplicitRelease=true
 	h.WriteExt=true
 	enc:=codec.NewEncoder(w,h)
+	defer enc.Release()
 	for {
 		select {
 			case <-db.StopChan:
 				log.Info("stop request received")
+				db.conn.Close()
 				return
 			case obs:=<-inChan:
 				log.Debug("received observation")
+				enc.Reset(w)
 				err:=enc.Encode(makeObservationMessage(obs))
 				if err!=nil {
 					log.Warnf("encoding observation failed: %s",err)
-					enc.Reset(w)
 					continue
 				}
 				len,err:=w.WriteTo(db.conn)
 				if err!=nil {
+					db.conn.Close()
 					log.Warnf("sending observation failed: %s",err)
-					enc.Reset(w)
 					reconnect_ok:=db.waitForReconnect()
 					if( !reconnect_ok ) { return }
 				}
-				enc.Reset(w)
 				log.Debugf("sent %d bytes",len)
 		}
 	}
@@ -135,7 +139,6 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 	enc.Encode(makeQueryMessage(qry))
 	n,err_enc:=w.WriteTo(db.conn)
 	if err_enc!=nil {
-		enc.Reset(w)
 		return []observation.Observation{},err_enc
 	}
 	log.Debugf("sent %d bytes",n)
