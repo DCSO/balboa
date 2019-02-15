@@ -17,7 +17,8 @@ import (
 
 type RemoteBackend struct {
 	host string
-	conn net.Conn
+	obsConn net.Conn
+	qryConn net.Conn
 	StopChan chan bool
 }
 
@@ -47,11 +48,15 @@ func makeQueryMessage( qry Query ) *Message {
 }
 
 func MakeRemoteBackend( host string ) (*RemoteBackend,error) {
-	conn,err:=net.Dial("tcp",host)
-	if err!=nil {
-		return nil,err
+	obsConn,obsConnErr:=net.Dial("tcp",host)
+	if obsConnErr!=nil {
+		return nil,obsConnErr
 	}
-	return &RemoteBackend{conn:conn,StopChan:make(chan bool),host:host},nil
+	qryConn,qryConnErr:=net.Dial("tcp",host)
+	if qryConnErr!=nil {
+		return nil,qryConnErr
+	}
+	return &RemoteBackend{obsConn:obsConn,qryConn:qryConn,StopChan:make(chan bool),host:host},nil
 }
 
 func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) observation.Observation {
@@ -59,24 +64,24 @@ func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) obse
 	return observation.Observation{}
 }
 
-func (db *RemoteBackend) reconnect( ack chan bool ){
+func (db *RemoteBackend) obsReconnect( ack chan bool ){
 	for {
 		log.Warnf("reconnecting to host=`%s`",db.host)
 		conn,err:=net.Dial("tcp",db.host)
 		if err==nil {
-			log.Warnf("reconnect successfull");
-			db.conn=conn
+			log.Warnf("obsReconnect successfull");
+			db.obsConn=conn
 			ack<-true
 			return
 		}
-		log.Warnf("reconnect failed: %s",err)
+		log.Warnf("obsReconnect failed: %s",err)
 		time.Sleep(SleepTimeForReconnect)
 	}
 }
 
-func (db *RemoteBackend) waitForReconnect( ) bool {
+func (db *RemoteBackend) waitForObsReconnect( ) bool {
 	ack:=make(chan bool)
-	go db.reconnect(ack)
+	go db.obsReconnect(ack)
 	ok:=<-ack
 	return ok
 }
@@ -92,7 +97,6 @@ func (db *RemoteBackend) ConsumeFeed( inChan chan observation.InputObservation )
 		select {
 			case <-db.StopChan:
 				log.Info("stop request received")
-				db.conn.Close()
 				return
 			case obs:=<-inChan:
 				log.Debug("received observation")
@@ -102,17 +106,40 @@ func (db *RemoteBackend) ConsumeFeed( inChan chan observation.InputObservation )
 					log.Warnf("encoding observation failed: %s",err)
 					continue
 				}
-				len,err:=w.WriteTo(db.conn)
+				len,err:=w.WriteTo(db.obsConn)
 				if err!=nil {
-					db.conn.Close()
+					db.obsConn.Close()
 					log.Warnf("sending observation failed: %s",err)
-					reconnect_ok:=db.waitForReconnect()
+					reconnect_ok:=db.waitForObsReconnect()
 					if( !reconnect_ok ) { return }
 				}
 				log.Debugf("sent %d bytes",len)
 		}
 	}
 }
+
+func (db *RemoteBackend) qryReconnect( ack chan bool ){
+	for {
+		log.Warnf("reconnecting to host=`%s`",db.host)
+		conn,err:=net.Dial("tcp",db.host)
+		if err==nil {
+			log.Warnf("qryReconnect successfull");
+			db.qryConn=conn
+			ack<-true
+			return
+		}
+		log.Warnf("qryReconnect failed: %s",err)
+		time.Sleep(SleepTimeForReconnect)
+	}
+}
+
+func (db *RemoteBackend) waitForQryReconnect( ) bool {
+	ack:=make(chan bool)
+	go db.qryReconnect(ack)
+	ok:=<-ack
+	return ok
+}
+
 
 func sanitize( s *string ) string {
 	if s==nil {
@@ -137,16 +164,26 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 	h:=new(codec.MsgpackHandle)
 	enc:=codec.NewEncoder(w,h)
 	enc.Encode(makeQueryMessage(qry))
-	n,err_enc:=w.WriteTo(db.conn)
+	n,err_enc:=w.WriteTo(db.qryConn)
 	if err_enc!=nil {
+		db.qryConn.Close()
+		reconnect_ok:=db.waitForQryReconnect()
+		if( !reconnect_ok ){
+			log.Warnf("query reconnect failed")
+		}
 		return []observation.Observation{},err_enc
 	}
 	log.Debugf("sent %d bytes",n)
-	dec:=codec.NewDecoder(db.conn,h)
+	dec:=codec.NewDecoder(db.qryConn,h)
 	var result Result
 	err_dec:=dec.Decode(&result)
 	// local decode failed
 	if err_dec!=nil {
+		db.qryConn.Close()
+		reconnect_ok:=db.waitForQryReconnect()
+		if( !reconnect_ok ){
+			log.Warnf("query reconnect failed")
+		}
 		return []observation.Observation{},err_dec
 	}
 	// seems like a remote error occured
@@ -164,5 +201,6 @@ func (db *RemoteBackend) TotalCount() (int,error) {
 }
 
 func (db *RemoteBackend) Shutdown() {
-	db.conn.Close()
+	db.qryConn.Close()
+	db.obsConn.Close()
 }
