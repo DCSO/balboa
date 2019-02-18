@@ -60,7 +60,7 @@ func (s *Setup) Run() (DB, error) {
 	var err error
 	switch s.Database.Type {
 	case "remote-backend":
-		db,err=MakeRemoteBackend(s.Database.HostAndPort)
+		db,err=MakeRemoteBackend(s.Database.HostAndPort,true)
 		if err!=nil {
 			return nil,err
 		}

@@ -12,6 +12,7 @@ import (
 )
 
 type Pool struct {
+	low int
 	Connect func() (net.Conn, error)
 	Ping func(interface{}) bool
 	Close func(net.Conn)
@@ -25,6 +26,7 @@ func MakePool(initCap, maxCap int, connectFn func() (net.Conn, error)) (*Pool, e
 	}
 	p := new(Pool)
 	p.store = make(chan net.Conn, maxCap)
+	p.low = initCap
 	if connectFn != nil {
 		p.Connect = connectFn
 	}
@@ -40,6 +42,16 @@ func MakePool(initCap, maxCap int, connectFn func() (net.Conn, error)) (*Pool, e
 
 func (p *Pool) Len() int {
 	return len(p.store)
+}
+
+func (p *Pool) Refill() {
+	for i := len(p.store); i < p.low; i++ {
+		v, err := p.create()
+		if err != nil {
+			return
+		}
+		p.store <- v
+	}
 }
 
 func (p *Pool) Get() (net.Conn, error) {

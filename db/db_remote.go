@@ -16,6 +16,7 @@ import (
 )
 
 type RemoteBackend struct {
+	UseRefillInsteadOfPutBack bool
 	host string
 	obsConn net.Conn
 	qryPool *Pool
@@ -52,7 +53,7 @@ func makeQueryMessage( qry Query ) *Message {
 	return &Message{Observations:[]observation.InputObservation{},Queries:[]Query{qry}}
 }
 
-func MakeRemoteBackend( host string ) (*RemoteBackend,error) {
+func MakeRemoteBackend( host string,refill bool ) (*RemoteBackend,error) {
 	obsConn,obsConnErr:=net.Dial("tcp",host)
 	if obsConnErr!=nil {
 		return nil,obsConnErr
@@ -66,7 +67,7 @@ func MakeRemoteBackend( host string ) (*RemoteBackend,error) {
 	if err != nil {
 		return nil,err
 	}
-	return &RemoteBackend{obsConn:obsConn,qryPool:pool,StopChan:make(chan bool),host:host},nil
+	return &RemoteBackend{UseRefillInsteadOfPutBack:refill,obsConn:obsConn,qryPool:pool,StopChan:make(chan bool),host:host},nil
 }
 
 func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) observation.Observation {
@@ -166,7 +167,7 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 
 	n,err_enc:=w.WriteTo(conn)
 	if err_enc!=nil {
-		log.Infof("sending qurey failed; closing connection")
+		log.Infof("sending query failed; closing connection")
 		conn.Close()
 		return []observation.Observation{},err_enc
 	}
@@ -191,7 +192,12 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 	}
 
 	// put back connection
-	db.qryPool.Put(conn)
+	if db.UseRefillInsteadOfPutBack {
+		conn.Close()
+		db.qryPool.Refill()
+	} else {
+		db.qryPool.Put(conn)
+	}
 
 	// check for a remote error (non connection related)
 	if result.Error!="" {
