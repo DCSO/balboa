@@ -150,7 +150,11 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 	w:=new(bytes.Buffer)
 	h:=new(codec.MsgpackHandle)
 	enc:=codec.NewEncoder(w,h)
-	enc.Encode(makeQueryMessage(qry))
+	enc_err:=enc.Encode(makeQueryMessage(qry))
+	if enc_err != nil {
+		log.Warnf("unable to encode query")
+		return []observation.Observation{},errors.New("query encode error")
+	}
 
 	conn,pool_err:=db.qryPool.Get()
 	if pool_err!=nil {
@@ -158,10 +162,19 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 		return []observation.Observation{},pool_err
 	}
 
+	wanted:=w.Len()
+
 	n,err_enc:=w.WriteTo(conn)
 	if err_enc!=nil {
+		log.Infof("sending qurey failed; closing connection")
 		conn.Close()
 		return []observation.Observation{},err_enc
+	}
+
+	if n!=int64(wanted) {
+		log.Infof("sending query failed; short write; closing connection")
+		conn.Close()
+		return []observation.Observation{},errors.New("sending query failed")
 	}
 
 	log.Debugf("sent query (%d bytes)",n)
