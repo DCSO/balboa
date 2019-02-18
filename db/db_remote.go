@@ -18,7 +18,7 @@ import (
 type RemoteBackend struct {
 	host string
 	obsConn net.Conn
-	qryConn net.Conn
+	qryPool *Pool
 	StopChan chan bool
 }
 
@@ -37,6 +37,11 @@ type Result struct {
 	Error string `codec:"E"`
 }
 
+const (
+	qryPoolInitialCapacity=23
+	qryPoolMaxCapacity=42
+)
+
 var SleepTimeForReconnect=10*time.Second
 
 func makeObservationMessage( obs observation.InputObservation ) *Message {
@@ -52,11 +57,16 @@ func MakeRemoteBackend( host string ) (*RemoteBackend,error) {
 	if obsConnErr!=nil {
 		return nil,obsConnErr
 	}
-	qryConn,qryConnErr:=net.Dial("tcp",host)
-	if qryConnErr!=nil {
-		return nil,qryConnErr
+	connectFn:=func() (net.Conn, error) {
+		log.Warnf("pool: connecting to %s",host)
+		c,err:=net.Dial("tcp",host)
+		return c,err
 	}
-	return &RemoteBackend{obsConn:obsConn,qryConn:qryConn,StopChan:make(chan bool),host:host},nil
+	pool,err:=MakePool(qryPoolInitialCapacity,qryPoolMaxCapacity,connectFn)
+	if err != nil {
+		return nil,err
+	}
+	return &RemoteBackend{obsConn:obsConn,qryPool:pool,StopChan:make(chan bool),host:host},nil
 }
 
 func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) observation.Observation {
@@ -118,29 +128,6 @@ func (db *RemoteBackend) ConsumeFeed( inChan chan observation.InputObservation )
 	}
 }
 
-func (db *RemoteBackend) qryReconnect( ack chan bool ){
-	for {
-		log.Warnf("reconnecting to host=`%s`",db.host)
-		conn,err:=net.Dial("tcp",db.host)
-		if err==nil {
-			log.Warnf("qryReconnect successfull");
-			db.qryConn=conn
-			ack<-true
-			return
-		}
-		log.Warnf("qryReconnect failed: %s",err)
-		time.Sleep(SleepTimeForReconnect)
-	}
-}
-
-func (db *RemoteBackend) waitForQryReconnect( ) bool {
-	ack:=make(chan bool)
-	go db.qryReconnect(ack)
-	ok:=<-ack
-	return ok
-}
-
-
 func sanitize( s *string ) string {
 	if s==nil {
 		return ""
@@ -164,29 +151,36 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 	h:=new(codec.MsgpackHandle)
 	enc:=codec.NewEncoder(w,h)
 	enc.Encode(makeQueryMessage(qry))
-	n,err_enc:=w.WriteTo(db.qryConn)
+
+	conn,pool_err:=db.qryPool.Get()
+	if pool_err!=nil {
+		log.Warnf("unable to get connection from pool")
+		return []observation.Observation{},pool_err
+	}
+
+	n,err_enc:=w.WriteTo(conn)
 	if err_enc!=nil {
-		db.qryConn.Close()
-		reconnect_ok:=db.waitForQryReconnect()
-		if( !reconnect_ok ){
-			log.Warnf("query reconnect failed")
-		}
+		conn.Close()
 		return []observation.Observation{},err_enc
 	}
-	log.Debugf("sent %d bytes",n)
-	dec:=codec.NewDecoder(db.qryConn,h)
+
+	log.Debugf("sent query (%d bytes)",n)
+
+	dec:=codec.NewDecoder(conn,h)
 	var result Result
 	err_dec:=dec.Decode(&result)
-	// local decode failed
+
+	log.Debugf("received answer")
+
 	if err_dec!=nil {
-		db.qryConn.Close()
-		reconnect_ok:=db.waitForQryReconnect()
-		if( !reconnect_ok ){
-			log.Warnf("query reconnect failed")
-		}
+		conn.Close()
 		return []observation.Observation{},err_dec
 	}
-	// seems like a remote error occured
+
+	// put back connection
+	db.qryPool.Put(conn)
+
+	// check for a remote error (non connection related)
 	if result.Error!="" {
 		if len(result.Observations)>0 {
 			log.Warnf("discarding %v query results due to non-empty error message",len(result.Observations))
@@ -201,6 +195,6 @@ func (db *RemoteBackend) TotalCount() (int,error) {
 }
 
 func (db *RemoteBackend) Shutdown() {
-	db.qryConn.Close()
+	db.qryPool.Teardown()
 	db.obsConn.Close()
 }
