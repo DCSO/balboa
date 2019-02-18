@@ -59,7 +59,7 @@ func MakeRemoteBackend( host string,refill bool ) (*RemoteBackend,error) {
 		return nil,obsConnErr
 	}
 	connectFn:=func() (net.Conn, error) {
-		log.Warnf("pool: connecting to %s",host)
+		log.Debugf("pool: connecting to %s",host)
 		c,err:=net.Dial("tcp",host)
 		return c,err
 	}
