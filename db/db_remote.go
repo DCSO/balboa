@@ -4,191 +4,193 @@
 package db
 
 import (
-	"net"
 	"bytes"
 	"errors"
+	"net"
 	"time"
 
 	"github.com/DCSO/balboa/observation"
 
-	"github.com/ugorji/go/codec"
 	log "github.com/sirupsen/logrus"
+	"github.com/ugorji/go/codec"
 )
 
 type RemoteBackend struct {
-	host string
-	obsConn net.Conn
+	host     string
+	obsConn  net.Conn
 	StopChan chan bool
 }
 
 type Message struct {
 	Observations []observation.InputObservation `codec:"O"`
-	Queries []Query `codec:"Q"`
+	Queries      []Query                        `codec:"Q"`
 }
 
 type Query struct {
-	Qrdata,Qrrname,Qrrtype,QsensorID string
-	Hrdata,Hrrname,Hrrtype,HsensorID bool
+	Qrdata, Qrrname, Qrrtype, QsensorID string
+	Hrdata, Hrrname, Hrrtype, HsensorID bool
 }
 
 type Result struct {
 	Observations []observation.Observation `codec:"O"`
-	Error string `codec:"E"`
+	Error        string                    `codec:"E"`
 }
 
-var SleepTimeForReconnect=10*time.Second
+var SleepTimeForReconnect = 10 * time.Second
 
-func makeObservationMessage( obs observation.InputObservation ) *Message {
-	return &Message{Observations:[]observation.InputObservation{obs},Queries:[]Query{}}
+func makeObservationMessage(obs observation.InputObservation) *Message {
+	return &Message{Observations: []observation.InputObservation{obs}, Queries: []Query{}}
 }
 
-func makeQueryMessage( qry Query ) *Message {
-	return &Message{Observations:[]observation.InputObservation{},Queries:[]Query{qry}}
+func makeQueryMessage(qry Query) *Message {
+	return &Message{Observations: []observation.InputObservation{}, Queries: []Query{qry}}
 }
 
-func MakeRemoteBackend( host string,refill bool ) (*RemoteBackend,error) {
-	obsConn,obsConnErr:=net.Dial("tcp",host)
-	if obsConnErr!=nil {
-		return nil,obsConnErr
+func MakeRemoteBackend(host string, refill bool) (*RemoteBackend, error) {
+	obsConn, obsConnErr := net.Dial("tcp", host)
+	if obsConnErr != nil {
+		return nil, obsConnErr
 	}
-	return &RemoteBackend{obsConn:obsConn,StopChan:make(chan bool),host:host},nil
+	return &RemoteBackend{obsConn: obsConn, StopChan: make(chan bool), host: host}, nil
 }
 
-func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) observation.Observation {
+func (db *RemoteBackend) AddObservation(obs observation.InputObservation) observation.Observation {
 	log.Warn("AddObservation() not implemented")
 	return observation.Observation{}
 }
 
-func (db *RemoteBackend) obsReconnect( ack chan bool ){
+func (db *RemoteBackend) obsReconnect(ack chan bool) {
 	for {
-		log.Warnf("reconnecting to host=`%s`",db.host)
-		conn,err:=net.Dial("tcp",db.host)
-		if err==nil {
-			log.Warnf("obsReconnect successfull");
-			db.obsConn=conn
-			ack<-true
+		log.Warnf("reconnecting to host=`%s`", db.host)
+		conn, err := net.Dial("tcp", db.host)
+		if err == nil {
+			log.Warnf("obsReconnect successfull")
+			db.obsConn = conn
+			ack <- true
 			return
 		}
-		log.Warnf("obsReconnect failed: %s",err)
+		log.Warnf("obsReconnect failed: %s", err)
 		time.Sleep(SleepTimeForReconnect)
 	}
 }
 
-func (db *RemoteBackend) waitForObsReconnect( ) bool {
-	ack:=make(chan bool)
+func (db *RemoteBackend) waitForObsReconnect() bool {
+	ack := make(chan bool)
 	go db.obsReconnect(ack)
-	ok:=<-ack
+	ok := <-ack
 	return ok
 }
 
-func (db *RemoteBackend) ConsumeFeed( inChan chan observation.InputObservation ) {
-	w:=new(bytes.Buffer)
-	h:=new(codec.MsgpackHandle)
-	h.ExplicitRelease=true
-	h.WriteExt=true
-	enc:=codec.NewEncoder(w,h)
+func (db *RemoteBackend) ConsumeFeed(inChan chan observation.InputObservation) {
+	w := new(bytes.Buffer)
+	h := new(codec.MsgpackHandle)
+	h.ExplicitRelease = true
+	h.WriteExt = true
+	enc := codec.NewEncoder(w, h)
 	defer enc.Release()
 	for {
 		select {
-			case <-db.StopChan:
-				log.Info("stop request received")
-				return
-			case obs:=<-inChan:
-				log.Debug("received observation")
-				enc.Reset(w)
-				err:=enc.Encode(makeObservationMessage(obs))
-				if err!=nil {
-					log.Warnf("encoding observation failed: %s",err)
-					continue
+		case <-db.StopChan:
+			log.Info("stop request received")
+			return
+		case obs := <-inChan:
+			log.Debug("received observation")
+			enc.Reset(w)
+			err := enc.Encode(makeObservationMessage(obs))
+			if err != nil {
+				log.Warnf("encoding observation failed: %s", err)
+				continue
+			}
+			len, err := w.WriteTo(db.obsConn)
+			if err != nil {
+				db.obsConn.Close()
+				log.Warnf("sending observation failed: %s", err)
+				reconnect_ok := db.waitForObsReconnect()
+				if !reconnect_ok {
+					return
 				}
-				len,err:=w.WriteTo(db.obsConn)
-				if err!=nil {
-					db.obsConn.Close()
-					log.Warnf("sending observation failed: %s",err)
-					reconnect_ok:=db.waitForObsReconnect()
-					if( !reconnect_ok ) { return }
-				}
-				log.Debugf("sent %d bytes",len)
+			}
+			log.Debugf("sent %d bytes", len)
 		}
 	}
 }
 
-func sanitize( s *string ) string {
-	if s==nil {
+func sanitize(s *string) string {
+	if s == nil {
 		return ""
-	}else{
+	} else {
 		return *s
 	}
 }
 
-func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]observation.Observation,error) {
-	qry:=Query{
-		Qrdata:sanitize(qrdata),
-		Hrdata:qrdata!=nil,
-		Qrrname:sanitize(qrrname),
-		Hrrname:qrrname!=nil,
-		Qrrtype:sanitize(qrrtype),
-		Hrrtype:qrrtype!=nil,
-		QsensorID:sanitize(qsensorID),
-		HsensorID:qsensorID!=nil,
+func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string) ([]observation.Observation, error) {
+	qry := Query{
+		Qrdata:    sanitize(qrdata),
+		Hrdata:    qrdata != nil,
+		Qrrname:   sanitize(qrrname),
+		Hrrname:   qrrname != nil,
+		Qrrtype:   sanitize(qrrtype),
+		Hrrtype:   qrrtype != nil,
+		QsensorID: sanitize(qsensorID),
+		HsensorID: qsensorID != nil,
 	}
 
-	conn,conn_err:=net.Dial("tcp",db.host)
-	if conn_err!=nil {
+	conn, conn_err := net.Dial("tcp", db.host)
+	if conn_err != nil {
 		log.Warnf("unable to connect to backend")
-		return []observation.Observation{},conn_err
+		return []observation.Observation{}, conn_err
 	}
 	defer conn.Close()
 
-	w:=new(bytes.Buffer)
-	h:=new(codec.MsgpackHandle)
-	enc:=codec.NewEncoder(w,h)
-	enc_err:=enc.Encode(makeQueryMessage(qry))
+	w := new(bytes.Buffer)
+	h := new(codec.MsgpackHandle)
+	enc := codec.NewEncoder(w, h)
+	enc_err := enc.Encode(makeQueryMessage(qry))
 	if enc_err != nil {
 		log.Warnf("unable to encode query")
-		return []observation.Observation{},errors.New("query encode error")
+		return []observation.Observation{}, errors.New("query encode error")
 	}
 
-	wanted:=w.Len()
+	wanted := w.Len()
 
-	n,err_enc:=w.WriteTo(conn)
-	if err_enc!=nil {
+	n, err_enc := w.WriteTo(conn)
+	if err_enc != nil {
 		log.Infof("sending query failed; closing connection")
 		conn.Close()
-		return []observation.Observation{},err_enc
+		return []observation.Observation{}, err_enc
 	}
 
-	if n!=int64(wanted) {
+	if n != int64(wanted) {
 		log.Infof("sending query failed; short write; closing connection")
 		conn.Close()
-		return []observation.Observation{},errors.New("sending query failed")
+		return []observation.Observation{}, errors.New("sending query failed")
 	}
 
-	log.Debugf("sent query (%d bytes)",n)
+	log.Debugf("sent query (%d bytes)", n)
 
-	dec:=codec.NewDecoder(conn,h)
+	dec := codec.NewDecoder(conn, h)
 	var result Result
-	err_dec:=dec.Decode(&result)
+	err_dec := dec.Decode(&result)
 
 	log.Debugf("received answer")
 
-	if err_dec!=nil {
+	if err_dec != nil {
 		conn.Close()
-		return []observation.Observation{},err_dec
+		return []observation.Observation{}, err_dec
 	}
 
 	// check for a remote error (non connection related)
-	if result.Error!="" {
-		if len(result.Observations)>0 {
-			log.Warnf("discarding %v query results due to non-empty error message",len(result.Observations))
+	if result.Error != "" {
+		if len(result.Observations) > 0 {
+			log.Warnf("discarding %v query results due to non-empty error message", len(result.Observations))
 		}
-		return []observation.Observation{},errors.New(result.Error)
+		return []observation.Observation{}, errors.New(result.Error)
 	}
-	return result.Observations,nil
+	return result.Observations, nil
 }
 
-func (db *RemoteBackend) TotalCount() (int,error) {
-	return -1,nil
+func (db *RemoteBackend) TotalCount() (int, error) {
+	return -1, nil
 }
 
 func (db *RemoteBackend) Shutdown() {

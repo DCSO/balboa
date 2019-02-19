@@ -7,16 +7,16 @@ package db
 
 import (
 	"fmt"
-	"sync"
 	"net"
+	"sync"
 )
 
 type Pool struct {
-	low int
-	Connect func() (net.Conn, error)
-	Ping func(interface{}) bool
-	Close func(net.Conn)
-	store chan net.Conn
+	low          int
+	Connect      func() (net.Conn, error)
+	Ping         func(interface{}) bool
+	Close        func(net.Conn)
+	store        chan net.Conn
 	destroyMutex sync.Mutex
 }
 

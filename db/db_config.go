@@ -14,8 +14,8 @@ import (
 // YAML.
 type Setup struct {
 	Database struct {
-		Name string `yaml:"name"`
-		Type string `yaml:"type"`
+		Name        string `yaml:"name"`
+		Type        string `yaml:"type"`
 		HostAndPort string `yaml:"host"`
 		// for local storage
 		DBPath string `yaml:"db_path"`
@@ -46,7 +46,7 @@ func LoadSetup(in []byte) (*Setup, error) {
 	switch s.Database.Type {
 	case "remote-backend":
 		if len(s.Database.HostAndPort) == 0 {
-			return nil, fmt.Errorf("%s: no host defined",s.Database.Name)
+			return nil, fmt.Errorf("%s: no host defined", s.Database.Name)
 		}
 	}
 	return &s, nil
@@ -60,9 +60,9 @@ func (s *Setup) Run() (DB, error) {
 	var err error
 	switch s.Database.Type {
 	case "remote-backend":
-		db,err=MakeRemoteBackend(s.Database.HostAndPort,true)
-		if err!=nil {
-			return nil,err
+		db, err = MakeRemoteBackend(s.Database.HostAndPort, true)
+		if err != nil {
+			return nil, err
 		}
 	}
 	s.LoadedDB = db
