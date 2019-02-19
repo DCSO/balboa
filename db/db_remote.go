@@ -16,10 +16,8 @@ import (
 )
 
 type RemoteBackend struct {
-	UseRefillInsteadOfPutBack bool
 	host string
 	obsConn net.Conn
-	qryPool *Pool
 	StopChan chan bool
 }
 
@@ -38,11 +36,6 @@ type Result struct {
 	Error string `codec:"E"`
 }
 
-const (
-	qryPoolInitialCapacity=23
-	qryPoolMaxCapacity=42
-)
-
 var SleepTimeForReconnect=10*time.Second
 
 func makeObservationMessage( obs observation.InputObservation ) *Message {
@@ -58,16 +51,7 @@ func MakeRemoteBackend( host string,refill bool ) (*RemoteBackend,error) {
 	if obsConnErr!=nil {
 		return nil,obsConnErr
 	}
-	connectFn:=func() (net.Conn, error) {
-		log.Debugf("pool: connecting to %s",host)
-		c,err:=net.Dial("tcp",host)
-		return c,err
-	}
-	pool,err:=MakePool(qryPoolInitialCapacity,qryPoolMaxCapacity,connectFn)
-	if err != nil {
-		return nil,err
-	}
-	return &RemoteBackend{UseRefillInsteadOfPutBack:refill,obsConn:obsConn,qryPool:pool,StopChan:make(chan bool),host:host},nil
+	return &RemoteBackend{obsConn:obsConn,StopChan:make(chan bool),host:host},nil
 }
 
 func (db *RemoteBackend) AddObservation( obs observation.InputObservation ) observation.Observation {
@@ -148,6 +132,14 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 		QsensorID:sanitize(qsensorID),
 		HsensorID:qsensorID!=nil,
 	}
+
+	conn,conn_err:=net.Dial("tcp",db.host)
+	if conn_err!=nil {
+		log.Warnf("unable to connect to backend")
+		return []observation.Observation{},conn_err
+	}
+	defer conn.Close()
+
 	w:=new(bytes.Buffer)
 	h:=new(codec.MsgpackHandle)
 	enc:=codec.NewEncoder(w,h)
@@ -155,12 +147,6 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 	if enc_err != nil {
 		log.Warnf("unable to encode query")
 		return []observation.Observation{},errors.New("query encode error")
-	}
-
-	conn,pool_err:=db.qryPool.Get()
-	if pool_err!=nil {
-		log.Warnf("unable to get connection from pool")
-		return []observation.Observation{},pool_err
 	}
 
 	wanted:=w.Len()
@@ -191,14 +177,6 @@ func (db *RemoteBackend) Search(qrdata,qrrname,qrrtype,qsensorID *string) ([]obs
 		return []observation.Observation{},err_dec
 	}
 
-	// put back connection
-	if db.UseRefillInsteadOfPutBack {
-		conn.Close()
-		db.qryPool.Refill()
-	} else {
-		db.qryPool.Put(conn)
-	}
-
 	// check for a remote error (non connection related)
 	if result.Error!="" {
 		if len(result.Observations)>0 {
@@ -214,6 +192,5 @@ func (db *RemoteBackend) TotalCount() (int,error) {
 }
 
 func (db *RemoteBackend) Shutdown() {
-	db.qryPool.Teardown()
 	db.obsConn.Close()
 }
