@@ -16,8 +16,8 @@ type InputObservation struct {
 	Rrtype string `codec:"T"`
 	Rrname string `codec:"N"`
 	SensorID string `codec:"I"`
-	TimestampEnd time.Time `codec:"F"`
-	TimestampStart time.Time `codec:"L"`
+	TimestampEnd time.Time `codec:"L"`
+	TimestampStart time.Time `codec:"F"`
 }
 
 // InChan is the global input channel delivering InputObservations from
