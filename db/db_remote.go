@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"net"
-	"time"
 
 	obs "github.com/DCSO/balboa/observation"
 
@@ -17,7 +16,6 @@ import (
 
 type RemoteBackend struct {
 	host     string
-	obsConn  net.Conn
 	StopChan chan bool
 }
 
@@ -51,96 +49,76 @@ const (
 	TypeQueryResponse = 129
 )
 
-var SleepTimeForReconnect = 10 * time.Second
-
 func (enc *Encoder) encode_observation_message(o obs.InputObservation) (*bytes.Buffer, error) {
+	enc.inner.Reset()
+	enc.outer.Reset()
 	enc.enc.Reset(enc.inner)
-	err_inner := enc.enc.Encode(InputMessage{Obs: []obs.InputObservation{o}})
-	if err_inner != nil {
-		return nil, err_inner
+	inner_err := enc.enc.Encode(InputMessage{Obs: []obs.InputObservation{o}})
+	if inner_err != nil {
+		return nil, inner_err
 	}
 	enc.enc.Reset(enc.outer)
-	err_outer := enc.enc.Encode(&TypedMessage{Type: TypeInputMessage, EncodedMessage: enc.inner.Bytes()})
-	if err_inner != nil {
-		return nil, err_outer
+	outer_err := enc.enc.Encode(&TypedMessage{Type: TypeInputMessage, EncodedMessage: enc.inner.Bytes()})
+	if outer_err != nil {
+		return nil, outer_err
 	}
 	return enc.outer, nil
 }
 
 func (enc *Encoder) encode_query_message(qry QueryMessage) (*bytes.Buffer, error) {
+	enc.inner.Reset()
+	enc.outer.Reset()
 	enc.enc.Reset(enc.inner)
-	err_inner := enc.enc.Encode(qry)
-	if err_inner != nil {
-		return nil, err_inner
+	inner_err := enc.enc.Encode(qry)
+	if inner_err != nil {
+		return nil, inner_err
 	}
 	enc.enc.Reset(enc.outer)
-	err_outer := enc.enc.Encode(&TypedMessage{Type: TypeQueryMessage, EncodedMessage: enc.inner.Bytes()})
-	if err_inner != nil {
-		return nil, err_outer
+	outer_err := enc.enc.Encode(&TypedMessage{Type: TypeQueryMessage, EncodedMessage: enc.inner.Bytes()})
+	if outer_err != nil {
+		return nil, outer_err
 	}
 	return enc.outer, nil
 }
 
 func (enc *Encoder) Encode_error_response(err ErrorResponse) (*bytes.Buffer, error) {
-	enc.enc.Reset(enc.inner)
-	err_inner := enc.enc.Encode(err)
-	if err_inner != nil {
-		return nil, err_inner
+	enc.inner.Reset()
+	enc.outer.Reset()
+	inner_err := enc.enc.Encode(err)
+	if inner_err != nil {
+		return nil, inner_err
 	}
 	enc.enc.Reset(enc.outer)
-	err_outer := enc.enc.Encode(&TypedMessage{Type: TypeQueryMessage, EncodedMessage: enc.inner.Bytes()})
-	if err_inner != nil {
-		return nil, err_outer
+	outer_err := enc.enc.Encode(&TypedMessage{Type: TypeQueryMessage, EncodedMessage: enc.inner.Bytes()})
+	if outer_err != nil {
+		return nil, outer_err
 	}
 	return enc.outer, nil
 }
 
 func (enc *Encoder) Encode_query_response(rep QueryResponse) (*bytes.Buffer, error) {
+	enc.inner.Reset()
+	enc.outer.Reset()
 	enc.enc.Reset(enc.inner)
-	err_inner := enc.enc.Encode(rep)
-	if err_inner != nil {
-		return nil, err_inner
+	inner_err := enc.enc.Encode(rep)
+	if inner_err != nil {
+		return nil, inner_err
 	}
 	enc.enc.Reset(enc.outer)
-	err_outer := enc.enc.Encode(&TypedMessage{Type: TypeQueryMessage, EncodedMessage: enc.inner.Bytes()})
-	if err_inner != nil {
-		return nil, err_outer
+	outer_err := enc.enc.Encode(&TypedMessage{Type: TypeQueryResponse, EncodedMessage: enc.inner.Bytes()})
+	if outer_err != nil {
+		return nil, outer_err
 	}
 	return enc.outer, nil
 }
 
 func MakeRemoteBackend(host string, refill bool) (*RemoteBackend, error) {
-	obsConn, obsConnErr := net.Dial("tcp", host)
-	if obsConnErr != nil {
-		return nil, obsConnErr
-	}
-	return &RemoteBackend{obsConn: obsConn, StopChan: make(chan bool), host: host}, nil
+	return &RemoteBackend{StopChan: make(chan bool), host: host}, nil
 }
 
 func (db *RemoteBackend) AddObservation(o obs.InputObservation) obs.Observation {
 	log.Warn("AddObservation() not implemented")
 	return obs.Observation{}
-}
-
-func (db *RemoteBackend) obsReconnect(ack chan bool) {
-	for {
-		log.Warnf("reconnecting to host=`%s`", db.host)
-		conn, err := net.Dial("tcp", db.host)
-		if err == nil {
-			db.obsConn = conn
-			ack <- true
-			return
-		}
-		log.Warnf("reconnect failed: %s", err)
-		time.Sleep(SleepTimeForReconnect)
-	}
-}
-
-func (db *RemoteBackend) waitForObsReconnect() bool {
-	ack := make(chan bool)
-	go db.obsReconnect(ack)
-	ok := <-ack
-	return ok
 }
 
 type Encoder struct {
@@ -164,15 +142,15 @@ func MakeEncoder() *Encoder {
 }
 
 type Decoder struct {
-	conn  net.Conn
-	outer *bytes.Buffer
-	dec   *codec.Decoder
+	conn net.Conn
+	outer_dec *codec.Decoder
+	inner_dec *codec.Decoder
 }
 
 func (dec *Decoder) Expect_typed_message() (*TypedMessage, error) {
-	dec.dec.Reset(dec.conn)
+	//dec.outer_dec.Reset(dec.conn)
 	var msg TypedMessage
-	err := dec.dec.Decode(&msg)
+	err := dec.outer_dec.Decode(&msg)
 	if err != nil {
 		return nil, err
 	}
@@ -180,9 +158,9 @@ func (dec *Decoder) Expect_typed_message() (*TypedMessage, error) {
 }
 
 func (dec *Decoder) Expect_query_message1(buf []byte) (*QueryMessage, error) {
-	dec.dec.Reset(bytes.NewBuffer(buf))
+	dec.inner_dec.Reset(bytes.NewBuffer(buf))
 	var msg QueryMessage
-	err := dec.dec.Decode(&msg)
+	err := dec.inner_dec.Decode(&msg)
 	if err != nil {
 		return nil, err
 	}
@@ -190,9 +168,9 @@ func (dec *Decoder) Expect_query_message1(buf []byte) (*QueryMessage, error) {
 }
 
 func (dec *Decoder) Expect_input_message1(buf []byte) (*InputMessage, error) {
-	dec.dec.Reset(bytes.NewBuffer(buf))
+	dec.inner_dec.Reset(bytes.NewBuffer(buf))
 	var msg InputMessage
-	err := dec.dec.Decode(&msg)
+	err := dec.inner_dec.Decode(&msg)
 	if err != nil {
 		return nil, err
 	}
@@ -200,31 +178,33 @@ func (dec *Decoder) Expect_input_message1(buf []byte) (*InputMessage, error) {
 }
 
 func MakeDecoder(conn net.Conn) *Decoder {
-	outer := new(bytes.Buffer)
-	h := new(codec.MsgpackHandle)
-	h.ExplicitRelease = true
-	h.WriteExt = true
-	dec := codec.NewDecoder(conn, h)
-	return &Decoder{outer: outer, dec: dec, conn: conn}
+	outer_h := new(codec.MsgpackHandle)
+	outer_h.ExplicitRelease = true
+	outer_h.WriteExt = true
+	outer_dec := codec.NewDecoder(conn, outer_h)
+	inner_h := new(codec.MsgpackHandle)
+	inner_h.ExplicitRelease = true
+	inner_h.WriteExt = true
+	inner_dec := codec.NewDecoder(new(bytes.Buffer), inner_h)
+	return &Decoder{inner_dec: inner_dec, outer_dec: outer_dec, conn: conn}
 }
 
 func (dec *Decoder) Release() {
-	dec.dec.Release()
+	dec.inner_dec.Release()
+	dec.outer_dec.Release()
 }
 
 func (dec *Decoder) expect_query_response() (*QueryResponse, error) {
-	dec.dec.Reset(dec.conn)
-	var msg TypedMessage
-	err_outer := dec.dec.Decode(&msg)
-	if err_outer != nil {
-		return nil, err_outer
+	msg, msg_err := dec.Expect_typed_message()
+	if msg_err != nil {
+		return nil, msg_err
 	}
-	dec.dec.Reset(bytes.NewBuffer(msg.EncodedMessage))
+	dec.inner_dec.Reset(bytes.NewBuffer(msg.EncodedMessage))
 	if msg.Type == TypeErrorResponse {
 		var rep ErrorResponse
-		err_inner := dec.dec.Decode(&rep)
-		if err_inner != nil {
-			return nil, err_inner
+		inner_err := dec.inner_dec.Decode(&rep)
+		if inner_err != nil {
+			return nil, inner_err
 		}
 		return nil, errors.New(rep.Message)
 	}
@@ -232,9 +212,9 @@ func (dec *Decoder) expect_query_response() (*QueryResponse, error) {
 		return nil, errors.New("invalid query response")
 	}
 	var rep QueryResponse
-	err_inner := dec.dec.Decode(&rep)
-	if err_inner != nil {
-		return nil, err_inner
+	inner_err := dec.inner_dec.Decode(&rep)
+	if inner_err != nil {
+		return nil, inner_err
 	}
 	return &rep, nil
 }
@@ -242,6 +222,12 @@ func (dec *Decoder) expect_query_response() (*QueryResponse, error) {
 func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
 	enc := MakeEncoder()
 	defer enc.Release()
+	conn, conn_err := net.Dial("tcp", db.host)
+	if conn_err != nil {
+		log.Warnf("connecting to backend failed: %v", conn_err)
+		return
+	}
+	defer conn.Close()
 	for {
 		select {
 		case <-db.StopChan:
@@ -254,16 +240,17 @@ func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
 				log.Warnf("encoding observation failed: %s", err)
 				continue
 			}
-			len, err := w.WriteTo(db.obsConn)
+			wanted := w.Len()
+			n, err := w.WriteTo(conn)
 			if err != nil {
-				db.obsConn.Close()
 				log.Warnf("sending observation failed: %s", err)
-				reconnect_ok := db.waitForObsReconnect()
-				if !reconnect_ok {
-					return
-				}
+				return
 			}
-			log.Debugf("sent %d bytes", len)
+			if n != int64(wanted) {
+				log.Warnf("short write")
+				return
+			}
+			//log.Warnf("sent %v bytes",n)
 		}
 	}
 }
@@ -291,7 +278,7 @@ func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string) ([]
 
 	conn, conn_err := net.Dial("tcp", db.host)
 	if conn_err != nil {
-		log.Warnf("unable to connect to backend")
+		log.Warnf("connecting to backend failed %v", conn_err)
 		return []obs.Observation{}, conn_err
 	}
 	defer conn.Close()
@@ -342,5 +329,5 @@ func (db *RemoteBackend) TotalCount() (int, error) {
 }
 
 func (db *RemoteBackend) Shutdown() {
-	db.obsConn.Close()
+	close(db.StopChan)
 }

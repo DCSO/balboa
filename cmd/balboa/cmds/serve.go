@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/DCSO/balboa/db"
 	"github.com/DCSO/balboa/feeder"
@@ -20,7 +21,7 @@ import (
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Run the balboa server",
-	Long: `This command starts the balboa server, accepting submissions and 
+	Long: `This command starts the balboa server, accepting submissions and
 answering queries.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
@@ -102,7 +103,21 @@ answering queries.`,
 		}
 
 		// Start processing submissions
-		go db.ObservationDB.ConsumeFeed(observation.InChan)
+		consumeDone := make(chan bool, 1)
+		go func () {
+			for {
+				select {
+					case <-consumeDone:
+						log.Warnf("ConsumeFeed() done")
+						return
+					default:
+						log.Warnf("ConsumeFeed() starting")
+						db.ObservationDB.ConsumeFeed(observation.InChan)
+						log.Warnf("ConsumeFeed() finished")
+						time.Sleep(10*time.Second)
+				}
+			}
+		}()
 
 		// start query server
 		var port int
@@ -112,13 +127,13 @@ answering queries.`,
 		}
 		gql := query.GraphQLFrontend{}
 		gql.Run(int(port))
-
 		sigChan := make(chan os.Signal, 1)
 		done := make(chan bool, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		go func() {
 			sig := <-sigChan
 			log.Infof("received '%v' signal, shutting down", sig)
+			close(consumeDone)
 			stopChan := make(chan bool)
 			fsetup.Stop(stopChan)
 			<-stopChan
