@@ -263,7 +263,7 @@ func sanitize(s *string) string {
 	}
 }
 
-func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string) ([]obs.Observation, error) {
+func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string, limit int) ([]obs.Observation, error) {
 	qry := QueryMessage{
 		Qrdata:    sanitize(qrdata),
 		Hrdata:    qrdata != nil,
@@ -273,7 +273,7 @@ func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string) ([]
 		Hrrtype:   qrrtype != nil,
 		QsensorID: sanitize(qsensorID),
 		HsensorID: qsensorID != nil,
-		Limit:     1000,
+		Limit:     limit,
 	}
 
 	conn, conn_err := net.Dial("tcp", db.host)
