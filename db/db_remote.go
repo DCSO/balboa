@@ -43,10 +43,13 @@ type ErrorResponse struct {
 }
 
 const (
-	TypeInputMessage  = 1
-	TypeQueryMessage  = 2
-	TypeErrorResponse = 128
-	TypeQueryResponse = 129
+	TypeInputMessage             = 1
+	TypeQueryMessage             = 2
+	TypeErrorResponse            = 128
+	TypeQueryResponse            = 129
+	TypeQueryStreamStartResponse = 130
+	TypeQueryStreamDataResponse  = 131
+	TypeQureyStreamEndResponse   = 132
 )
 
 func (enc *Encoder) encode_observation_message(o obs.InputObservation) (*bytes.Buffer, error) {
@@ -142,7 +145,7 @@ func MakeEncoder() *Encoder {
 }
 
 type Decoder struct {
-	conn net.Conn
+	conn      net.Conn
 	outer_dec *codec.Decoder
 	inner_dec *codec.Decoder
 }
@@ -194,6 +197,37 @@ func (dec *Decoder) Release() {
 	dec.outer_dec.Release()
 }
 
+func (dec *Decoder) expect_query_stream_response() (*QueryResponse, error) {
+	var res []obs.Observation
+	for {
+		msg, msg_err := dec.Expect_typed_message()
+		if msg_err != nil {
+			return nil, msg_err
+		}
+		dec.inner_dec.Reset(bytes.NewBuffer(msg.EncodedMessage))
+		if msg.Type == TypeErrorResponse {
+			var rep ErrorResponse
+			inner_err := dec.inner_dec.Decode(&rep)
+			if inner_err != nil {
+				log.Warnf("got error response during stream data; discarding stream data")
+				return nil, inner_err
+			}
+			return nil, errors.New(rep.Message)
+		}
+		if msg.Type == TypeQueryStreamDataResponse {
+			var rep obs.Observation
+			inner_err := dec.inner_dec.Decode(&rep)
+			if inner_err != nil {
+				log.Warnf("decoding stream data response failed")
+				return nil, inner_err
+			}
+			res=append(res,rep)
+		} else if msg.Type == TypeQureyStreamEndResponse {
+			return &QueryResponse{Obs:res},nil
+		}
+	}
+}
+
 func (dec *Decoder) expect_query_response() (*QueryResponse, error) {
 	msg, msg_err := dec.Expect_typed_message()
 	if msg_err != nil {
@@ -208,15 +242,19 @@ func (dec *Decoder) expect_query_response() (*QueryResponse, error) {
 		}
 		return nil, errors.New(rep.Message)
 	}
-	if msg.Type != TypeQueryResponse {
+	if msg.Type == TypeQueryResponse {
+		var rep QueryResponse
+		inner_err := dec.inner_dec.Decode(&rep)
+		if inner_err != nil {
+			return nil, inner_err
+		}
+		return &rep, nil
+	} else if msg.Type == TypeQueryStreamStartResponse {
+		log.Debugf("got stream start response")
+		return dec.expect_query_stream_response()
+	} else {
 		return nil, errors.New("invalid query response")
 	}
-	var rep QueryResponse
-	inner_err := dec.inner_dec.Decode(&rep)
-	if inner_err != nil {
-		return nil, inner_err
-	}
-	return &rep, nil
 }
 
 func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
