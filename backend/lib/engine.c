@@ -612,7 +612,7 @@ int blb_thread_dump_entry( thread_t* th,const entry_t* entry ){
     return(0);
 }
 
-int blb_thread_query_stream_push_response( thread_t* th,entry_t* entry ){
+int blb_thread_query_stream_push_response( thread_t* th,const entry_t* entry ){
     T(
         prnl("query stream push entry");
         prnl("<%d `%.*s` `%.*s` `%.*s` `%.*s`>",

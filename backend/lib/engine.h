@@ -146,8 +146,8 @@ void blb_engine_teardown( engine_t* e);
 void blb_engine_run( engine_t* e );
 
 int blb_thread_query_stream_start_response( thread_t* th );
-int blb_thread_query_stream_push_response( thread_t*, entry_t* entry );
+int blb_thread_query_stream_push_response( thread_t*,const entry_t* entry );
 int blb_thread_query_stream_end_response( thread_t* th );
-int blb_thread_dump_entry( thread_t* th, const entry_t* entry );
+int blb_thread_dump_entry( thread_t* th,const entry_t* entry );
 
 #endif

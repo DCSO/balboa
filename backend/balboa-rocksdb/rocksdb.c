@@ -209,15 +209,15 @@ static int blb_rocksdb_query_by_i( thread_t* th,const query_t* q ){
     if( q->qsensorid_len>0 ){
         prefix_len=q->qrdata_len+q->qsensorid_len+4;
         (void)snprintf(th->scrtch_inv,ENGINE_THREAD_SCRTCH_SZ,
-                "i\x1f%.*s\x1f%.*s\x1f"
-               ,(int)q->qrdata_len,q->qrdata
-               ,(int)q->qsensorid_len,q->qsensorid
+            "i\x1f%.*s\x1f%.*s\x1f"
+           ,(int)q->qrdata_len,q->qrdata
+           ,(int)q->qsensorid_len,q->qsensorid
         );
     }else{
         prefix_len=q->qrdata_len+3;
         (void)snprintf(th->scrtch_inv,ENGINE_THREAD_SCRTCH_SZ,
-                "i\x1f%.*s\x1f"
-                ,(int)q->qrdata_len,q->qrdata
+            "i\x1f%.*s\x1f"
+            ,(int)q->qrdata_len,q->qrdata
         );
     }
     ASSERT( th->scrtch_inv[prefix_len]=='\0' );
@@ -306,11 +306,11 @@ static int blb_rocksdb_query_by_i( thread_t* th,const query_t* q ){
 
         memset(th->scrtch_key,'\0',ENGINE_THREAD_SCRTCH_SZ);
         (void)snprintf(th->scrtch_key,ENGINE_THREAD_SCRTCH_SZ
-               ,"o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s"
-               ,toks[RRNAME].tok_len,toks[RRNAME].tok
-               ,toks[SENSORID].tok_len,toks[SENSORID].tok
-               ,toks[RRTYPE].tok_len,toks[RRTYPE].tok
-               ,toks[RDATA].tok_len,toks[RDATA].tok
+           ,"o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s"
+           ,toks[RRNAME].tok_len,toks[RRNAME].tok
+           ,toks[SENSORID].tok_len,toks[SENSORID].tok
+           ,toks[RRTYPE].tok_len,toks[RRTYPE].tok
+           ,toks[RDATA].tok_len,toks[RDATA].tok
         );
 
         X(prnl("full key `%s`",th->scrtch_key));
@@ -526,19 +526,19 @@ static int blb_rocksdb_input( thread_t* th,const input_t* i ){
     (void)blb_rocksdb_val_encode(&v,val,val_len);
 
     (void)snprintf(th->scrtch_key,ENGINE_THREAD_SCRTCH_SZ,
-            "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s"
-           ,(int)i->rrname_len,i->rrname
-           ,(int)i->sensorid_len,i->sensorid
-           ,(int)i->rrtype_len,i->rrtype
-           ,(int)i->rdata_len,i->rdata
+        "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s"
+       ,(int)i->rrname_len,i->rrname
+       ,(int)i->sensorid_len,i->sensorid
+       ,(int)i->rrtype_len,i->rrtype
+       ,(int)i->rdata_len,i->rdata
     );
 
     (void)snprintf(th->scrtch_inv,ENGINE_THREAD_SCRTCH_SZ,
-            "i\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s"
-           ,(int)i->rdata_len,i->rdata
-           ,(int)i->sensorid_len,i->sensorid
-           ,(int)i->rrname_len,i->rrname
-           ,(int)i->rrtype_len,i->rrtype
+        "i\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s"
+       ,(int)i->rdata_len,i->rdata
+       ,(int)i->sensorid_len,i->sensorid
+       ,(int)i->rrname_len,i->rrname
+       ,(int)i->rrtype_len,i->rrtype
     );
 
     char *err=NULL;
