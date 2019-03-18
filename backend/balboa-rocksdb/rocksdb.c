@@ -44,8 +44,8 @@ void blb_rocksdb_teardown( db_t* _db ){
     rocksdb_mergeoperator_destroy(db->mergeop);
     rocksdb_writeoptions_destroy(db->writeoptions);
     rocksdb_readoptions_destroy(db->readoptions);
-    rocksdb_options_destroy(db->options);
-
+    // keeping this causes segfault; rocksdb_close seems to handle dealloc...
+    //rocksdb_options_destroy(db->options);
     blb_free(db);
 }
 
