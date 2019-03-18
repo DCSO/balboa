@@ -817,10 +817,52 @@ engine_t* blb_engine_new( db_t* db,const char* name,int port,int thread_throttle
     return(e);
 }
 
-static void blb_engine_sigint_consume( int signum ){
-    (void)signum;
-    L(prnl("got SIGINT; requesting engine stop"));
-    blb_engine_request_stop();
+static void* blb_engine_sigint_consume( void* usr ){
+    (void)usr;
+    sigset_t s;
+    sigemptyset(&s);
+    sigaddset(&s,SIGQUIT);
+    sigaddset(&s,SIGUSR1);
+    sigaddset(&s,SIGUSR2);
+    sigaddset(&s,SIGINT);
+    sigaddset(&s,SIGPIPE);
+    V(prnl("signal consumer thread started"));
+    //int unblock_ok=pthread_sigmask(SIG_UNBLOCK,s,NULL);
+    //V(prnl("pthread_sigmask returned `%d`",unblock_ok));
+    while( 1 ){
+        int sig=0;
+        int rc=sigwait(&s,&sig);
+        V(prnl("sigwait() returned `%d` (signal `%d`)",rc,sig));
+        if( rc!=0 ){
+            continue;
+        }
+        L(prnl("got signal `%d`",sig));
+        switch( sig ){
+            case SIGINT:
+                L(prnl("got SIGINT; requesting engine stop"));
+                blb_engine_request_stop();
+                break;
+            default: break;
+        }
+    }
+    return(NULL);
+}
+
+void blb_engine_signals_init( void ){
+    sigset_t s;
+    sigemptyset(&s);
+    sigaddset(&s,SIGQUIT);
+    sigaddset(&s,SIGUSR1);
+    sigaddset(&s,SIGUSR2);
+    sigaddset(&s,SIGINT);
+    sigaddset(&s,SIGPIPE);
+    int rc=pthread_sigmask(SIG_BLOCK,&s,NULL);
+    if( rc!=0 ){
+        L(prnl("pthread_sigmask() failed `%d`",rc));
+    }
+
+    pthread_t signal_consumer;
+    pthread_create(&signal_consumer,NULL,blb_engine_sigint_consume,NULL);
 }
 
 void blb_engine_run( engine_t* e ){
@@ -828,15 +870,14 @@ void blb_engine_run( engine_t* e ){
     socklen_t addrlen=sizeof(struct sockaddr_in);
 
     (void)signal(SIGPIPE,SIG_IGN);
-    (void)signal(SIGINT,blb_engine_sigint_consume);
-
-    fd_set fds;
-    struct timeval to;
+    //(void)signal(SIGINT,blb_engine_sigint_consume);
 
     pthread_attr_t __attr;
     pthread_attr_init(&__attr);
     pthread_attr_setdetachstate(&__attr,PTHREAD_CREATE_DETACHED);
 
+    fd_set fds;
+    struct timeval to;
     while( 1 ){
 timeout_retry:
         if( blb_engine_poll_stop()>0 ){
@@ -885,6 +926,7 @@ wait:
         sleep(1);
     }
 
+    L(prnl("done"));
 }
 
 void blb_engine_teardown( engine_t* e ){

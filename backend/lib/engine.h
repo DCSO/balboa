@@ -140,6 +140,7 @@ static inline void blb_dbi_dump( thread_t* th,const dump_t* d) {
     th->db->dbi->dump(th,d);
 }
 
+void blb_engine_signals_init( void );
 engine_t* blb_engine_new( db_t* db,const char* name,int port,int thread_throttle_limit );
 void blb_engine_teardown( engine_t* e);
 void blb_engine_run( engine_t* e );

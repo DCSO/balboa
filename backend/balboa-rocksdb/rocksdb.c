@@ -40,11 +40,11 @@ void blb_rocksdb_teardown( db_t* _db ){
     ASSERT( _db->dbi==&blb_rocksdb_dbi );
 
     blb_rocksdb_t* db=(blb_rocksdb_t*)_db;
+    rocksdb_close(db->db);
     rocksdb_mergeoperator_destroy(db->mergeop);
     rocksdb_writeoptions_destroy(db->writeoptions);
     rocksdb_readoptions_destroy(db->readoptions);
     rocksdb_options_destroy(db->options);
-    rocksdb_close(db->db);
 
     blb_free(db);
 }
@@ -567,7 +567,15 @@ rocksdb_t* blb_rocksdb_handle( db_t* _db ){
 }
 
 db_t* blb_rocksdb_open( blb_rocksdb_config_t* c ){
-    V(prnl("rocksdb database at `%s`",c->path));
+    V(
+        prnl("rocksdb database at `%s`",c->path);
+        prnl("parallelism `%d` membudget `%zu` max_log_file_size `%zu` keep_log_file_num `%d`"
+            ,c->parallelism
+            ,c->membudget
+            ,c->max_log_file_size
+            ,c->keep_log_file_num
+        );
+    );
 
     blb_rocksdb_t* db=blb_new(blb_rocksdb_t);
     if( db==NULL ){ return(NULL); }
@@ -585,15 +593,6 @@ db_t* blb_rocksdb_open( blb_rocksdb_config_t* c ){
     db->options=rocksdb_options_create();
     db->writeoptions=rocksdb_writeoptions_create();
     db->readoptions=rocksdb_readoptions_create();
-
-    V(
-        prnl("parallelism `%d` membudget `%zu` max_log_file_size `%zu` keep_log_file_num `%d`"
-            ,c->parallelism
-            ,c->membudget
-            ,c->max_log_file_size
-            ,c->keep_log_file_num
-        );
-    );
 
     rocksdb_options_increase_parallelism(db->options,c->parallelism);
     rocksdb_options_optimize_level_style_compaction(db->options,c->membudget);

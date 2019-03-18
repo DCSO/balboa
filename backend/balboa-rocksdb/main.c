@@ -48,6 +48,8 @@ int main( int argc,char** argv ){
     if( daemonize ){ theTrace_set_verbosity(0); }
     else{ theTrace_set_verbosity(verbosity); }
 
+    blb_engine_signals_init();
+
     db_t* db=blb_rocksdb_open(&config);
     if( db==NULL ){
         V(prnl("unable to open rocksdb at path `%s`",config.path));
@@ -63,9 +65,9 @@ int main( int argc,char** argv ){
 
     blb_engine_run(e);
 
-    blb_dbi_teardown(db);
-
     blb_engine_teardown(e);
+
+    blb_dbi_teardown(db);
 
     return(0);
 }
