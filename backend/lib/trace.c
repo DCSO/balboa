@@ -74,7 +74,7 @@ static void stderr_init( trace_t* trace ){
 }
 
 static trace_t __theTrace_stdout={
-    .verbosity=0,
+    .verbosity=ATOMIC_VAR_INIT(0),
     .release=stdout_release,
     .init=stdout_init,
     .lock=stdout_lock,
@@ -83,7 +83,7 @@ static trace_t __theTrace_stdout={
 };
 
 static trace_t __theTrace_stderr={
-    .verbosity=0,
+    .verbosity=ATOMIC_VAR_INIT(0),
     .release=stderr_release,
     .init=stderr_init,
     .lock=stderr_lock,
