@@ -280,8 +280,8 @@ static int dump_entry_replay_cb( state_t* state,entry_t* entry ){
     return(0);
 }
 
-static int main_json( int argc,char** argv ){
-    const char* db="/tmp/balboa.dmp";
+static int main_jsonize( int argc,char** argv ){
+    const char* db="-";
     ketopt_t opt=KETOPT_INIT;
     int c;
     while( (c=ketopt(&opt,argc,argv,1,"r:v",NULL))>=0 ){
@@ -322,6 +322,50 @@ static int dump_connect( const char* host,const char* _port ){
     int rc=connect(fd,&addr,sizeof(struct sockaddr_in));
     if( rc<0 ){ close(fd);return(-1); }
     return(fd);
+}
+
+__attribute__((noreturn)) void version( void ){
+    fprintf(stderr,"balboa-backend-console v2.0.0\n");
+    exit(1);
+}
+
+__attribute__((noreturn)) void usage( void ){
+    fprintf(stderr,"\
+`balboa-backend-console` is a management tool for `balboa-backends`\n\
+\n\
+Usage: balboa-backend-console <--version|help|jsonize|dump|replay> [options]\n\
+\n\
+Command help:\n\
+    show help\n\
+\n\
+Command jsonize:\n\
+    read a dump file and print all entries as json\n\
+\n\
+    -r <path> path to the dump file to read\n\
+\n\
+Command dump:\n\
+    connect to a `balboa-backend` and request a dump of all data to local stdout\n\
+\n\
+    -h <host> ip address of the `balboa-backend` (default: 127.0.0.1)\n\
+    -p <port> port of the `balboa-backend` (default: 4242)\n\
+    -v increase verbosity; can be passed multiple times\n\
+    -r <remote-path> unused (default: -)\n\
+\n\
+Command replay:\n\
+    replay a previously generated database dump\n\
+\n\
+    -d <path> database dump file or `-` for stdin (default: -)\n\
+    -h <host> ip address of the `balboa-backend` (default: 127.0.0.1)\n\
+    -p <port> port of the `balboa-backend` (default: 4242)\n\
+    -v increase verbosity; can be passed multiple times\n\
+\n\
+Examples:\n\
+\n\
+balboa-backend-console jsonize -r /tmp/pdns.dmp\n\
+lz4cat /tmp/pdns.dmp.lz4 | balboa-backend-console jsonize\n\
+\n\
+\n");
+    exit(1);
 }
 
 static int main_dump( int argc,char** argv ){
@@ -434,11 +478,11 @@ static int main_replay( int argc,char** argv ){
 int main( int argc,char** argv ){
     int res=-1;
     if( argc<2 ){
-        goto usage;
+        usage();
     }else if( strcmp(argv[1],"jsonize")==0 ){
         argc--;
         argv++;
-        res=main_json(argc,argv);
+        res=main_jsonize(argc,argv);
     }else if( strcmp(argv[1],"replay")==0 ){
         argc--;
         argv++;
@@ -447,18 +491,11 @@ int main( int argc,char** argv ){
         argc--;
         argv++;
         res=main_dump(argc,argv);
+    }else if( strcmp(argv[1],"--version")==0 ){
+        version();
     }else{
-        goto usage;
+        usage();
     }
 
     return(res);
-usage:
-    fprintf(stderr,"\n\
-usage:\n\
-    dump to-json [-v] -d <database-dump-or-'-'-for-stdin>\n\
-        - reads back a previously dumped balboa database and print as json\n\
-\n\
-    dump replay [-v] -h <balboa-backend-host> -p <balboa-backend-port> -d <database-dump-or-'-'-for-stdin>\n\
-\n");
-    return(1);
 }
