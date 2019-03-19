@@ -6,7 +6,7 @@
 #include <rocksdb.h>
 #include <trace.h>
 
-__attribute__((noreturn)) void usage( const blb_rocksdb_config_t* c){
+__attribute__((noreturn)) void usage( const blb_rocksdb_config_t* c ){
     fprintf(stderr,"\
 balboa-rocksdb [options]\n\
 where options:\n\
