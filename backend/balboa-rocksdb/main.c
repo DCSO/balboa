@@ -6,23 +6,30 @@
 #include <rocksdb.h>
 #include <trace.h>
 
+__attribute__((noreturn)) void version( void ){
+    fprintf(stderr,"balboa-rocksdb v2.0.0\n");
+    exit(1);
+}
+
 __attribute__((noreturn)) void usage( const blb_rocksdb_config_t* c ){
     fprintf(stderr,"\
-balboa-rocksdb [options]\n\
-where options:\n\
--h display this\n\
--D daemonize (default: off)\n\
--d <path> path to rocksdb database (default: `%s`)\n\
--l listen address (default: 127.0.0.1)\n\
--p listen port (default: 4242)\n\
--v increase verbosity; can be passed multiple times\n\
--j thread throttle limit, maximum concurrent connections (default: 64)\n\
---membudget <memory-in-bytes> rocksdb membudget option (value: %"PRIu64")\n\
---parallelism <number-of-threads> rocksdb parallelism option (value: %d)\n\
---max_log_file_size <size> rocksdb log file size option (value: %"PRIu64")\n\
---max_open_files <number> rocksdb max number of open files (value: %d)\n\
---keep_log_file_num <number> rocksdb max number of log files (value: %d)\n\
---database_path <path> same as `-d`\n"
+`balboa-rocksdb` provides a pdns database backend for `balboa`\n\
+\n\
+Usage: balboa-rocksdb [options]\n\
+\n\
+    -h display help\n\
+    -D daemonize (default: off)\n\
+    -d <path> path to rocksdb database (default: `%s`)\n\
+    -l listen address (default: 127.0.0.1)\n\
+    -p listen port (default: 4242)\n\
+    -v increase verbosity; can be passed multiple times\n\
+    -j thread throttle limit, maximum concurrent connections (default: 64)\n\
+    --membudget <memory-in-bytes> rocksdb membudget option (value: %"PRIu64")\n\
+    --parallelism <number-of-threads> rocksdb parallelism option (value: %d)\n\
+    --max_log_file_size <size> rocksdb log file size option (value: %"PRIu64")\n\
+    --max_open_files <number> rocksdb max number of open files (value: %d)\n\
+    --keep_log_file_num <number> rocksdb max number of log files (value: %d)\n\
+    --database_path <path> same as `-d`\n"
 ,c->path
 ,c->membudget
 ,c->parallelism
@@ -49,6 +56,7 @@ int main( int argc,char** argv ){
        ,{"max_open_files",ko_required_argument,304}
        ,{"keep_log_file_num",ko_required_argument,305}
        ,{"database_path",ko_required_argument,306}
+       ,{"version",ko_no_argument,307}
        ,{NULL,0,0}
     };
     int c;
@@ -67,6 +75,7 @@ int main( int argc,char** argv ){
             case 304: config.max_open_files=atoi(opt.arg);break;
             case 305: config.keep_log_file_num=atoi(opt.arg);break;
             case 306: config.path=opt.arg;break;
+            case 307: version();
             default:usage(&config);
         }
     }
