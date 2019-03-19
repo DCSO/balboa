@@ -6,6 +6,33 @@
 #include <rocksdb.h>
 #include <trace.h>
 
+__attribute__((noreturn)) void usage( const blb_rocksdb_config_t* c){
+    fprintf(stderr,"\
+balboa-rocksdb [options]\n\
+where options:\n\
+-h display this\n\
+-D daemonize (default: off)\n\
+-d <path> path to rocksdb database (default: `%s`)\n\
+-l listen address (default: 127.0.0.1)\n\
+-p listen port (default: 4242)\n\
+-v increase verbosity; can be passed multiple times\n\
+-j thread throttle limit, maximum concurrent connections (default: 64)\n\
+--membudget <memory-in-bytes> rocksdb membudget option (value: %"PRIu64")\n\
+--parallelism <number-of-threads> rocksdb parallelism option (value: %d)\n\
+--max_log_file_size <size> rocksdb log file size option (value: %"PRIu64")\n\
+--max_open_files <number> rocksdb max number of open files (value: %d)\n\
+--keep_log_file_num <number> rocksdb max number of log files (value: %d)\n\
+--database_path <path> same as `-d`\n"
+,c->path
+,c->membudget
+,c->parallelism
+,c->max_log_file_size
+,c->max_open_files
+,c->keep_log_file_num
+    );
+    exit(1);
+}
+
 int main( int argc,char** argv ){
     int verbosity=0;
     int daemonize=0;
@@ -25,7 +52,7 @@ int main( int argc,char** argv ){
        ,{NULL,0,0}
     };
     int c;
-    while( (c=ketopt(&opt,argc,argv,1,"j:d:l:p:vD",opts))>=0 ){
+    while( (c=ketopt(&opt,argc,argv,1,"j:d:l:p:vDh",opts))>=0 ){
         switch( c ){
             case 'D': daemonize=1;break;
             case 'd': config.path=opt.arg;break;
@@ -33,13 +60,14 @@ int main( int argc,char** argv ){
             case 'p': port=atoi(opt.arg);break;
             case 'v': verbosity+=1;break;
             case 'j': thread_throttle_limit=atoi(opt.arg);break;
+            case 'h': usage(&config);
             case 301: config.membudget=atoll(opt.arg);break;
             case 302: config.parallelism=atoi(opt.arg);break;
             case 303: config.max_log_file_size=atoi(opt.arg);break;
             case 304: config.max_open_files=atoi(opt.arg);break;
             case 305: config.keep_log_file_num=atoi(opt.arg);break;
             case 306: config.path=opt.arg;break;
-            default:break;
+            default:usage(&config);
         }
     }
 
