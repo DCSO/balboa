@@ -20,8 +20,8 @@ import (
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
-	Short: "Run the balboa server",
-	Long: `This command starts the balboa server, accepting submissions and
+	Short: "Run the balboa frontend",
+	Long: `This command starts the balboa frontend, accepting submissions and
 answering queries.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
