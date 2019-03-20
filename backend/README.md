@@ -7,14 +7,20 @@
 
 ### RocksDB Backend
 
-First, install the required depencencies. Aside from make and a working gcc
-installation rocksdb development files are necessary.
+First, install the required depencencies. Aside from `make` and a working `gcc`
+installation `rocksdb` development files are necessary.
 
 On Debian (testing and stretch-backports), one can satisfy these dependencies
 with:
 
 ```
 apt install librocksdb-dev
+```
+
+On Void Linux
+
+```
+xbps-install rocksdb-devel
 ```
 
 Building the RocksDB backend:
