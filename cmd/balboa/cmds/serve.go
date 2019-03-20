@@ -64,21 +64,9 @@ answering queries.`,
 			}
 		}
 
-		// Set up database from config file
-		var dbFile string
-		dbFile, err = cmd.Flags().GetString("dbconfig")
-		if err != nil {
-			log.Fatal(err)
-		}
-		cfgYaml, err := ioutil.ReadFile(dbFile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		dbsetup, err := db.LoadSetup(cfgYaml)
-		if err != nil {
-			log.Fatal(err)
-		}
-		db.ObservationDB, err = dbsetup.Run()
+		// connect to backend
+		host, err := cmd.Flags().GetString("host")
+		db.ObservationDB, err = db.MakeRemoteBackend(host, true)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -89,7 +77,7 @@ answering queries.`,
 		if err != nil {
 			log.Fatal(err)
 		}
-		cfgYaml, err = ioutil.ReadFile(feedersFile)
+		cfgYaml, err := ioutil.ReadFile(feedersFile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -137,9 +125,7 @@ answering queries.`,
 			stopChan := make(chan bool)
 			fsetup.Stop(stopChan)
 			<-stopChan
-			stopChan = make(chan bool)
-			dbsetup.Stop(stopChan)
-			<-stopChan
+			db.ObservationDB.Shutdown()
 			gql.Stop()
 			close(done)
 		}()
@@ -156,4 +142,5 @@ func init() {
 	serveCmd.Flags().IntP("port", "p", 8080, "port for GraphQL server")
 	serveCmd.Flags().StringP("logfile", "l", "/var/log/balboa.log", "log file path")
 	serveCmd.Flags().BoolP("logjson", "j", true, "output log file as JSON")
+	serveCmd.Flags().StringP("host","h","127.0.0.1:4242", "remote database host and port")
 }
