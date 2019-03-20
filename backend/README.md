@@ -1,38 +1,14 @@
-# balboa-backends [![CircleCI](https://circleci.com/gh/DCSO/balboa-backends.svg?style=svg)](https://circleci.com/gh/DCSO/balboa-backends)
+# balboa-backends
 
 `balboa-backends` is the central repository for database backends leveraged by
 [balboa](https://www.github.colm/DCSO/balboa)
 
 ## Building and Installation
 
-```
-$ go get github.com/DCSO/balboa-backends
-```
+### RocksDB Backend
 
-All backends reside self contained in separate directories
-
-```
-├── backend
-│   └── backend.go
-├── backend-mock
-│   └── main.go
-├── backend-rocksdb
-│   ├── lib
-│   │   ├── obs_rocksdb.c
-│   │   ├── obs_rocksdb.h
-│   │   ├── rocksdb.go
-│   │   └── rocksdb_test.go
-│   └── main.go
-├── LICENSE
-└── README.md
-```
-
-Building the RocksDB backend:
-
-```
-cd balboa-backends/backend-rocksdb
-go build
-```
+First, install the required depencencies. Aside from make and a working gcc
+installation rocksdb development files are necessary.
 
 On Debian (testing and stretch-backports), one can satisfy these dependencies
 with:
@@ -41,43 +17,35 @@ with:
 apt install librocksdb-dev
 ```
 
-## Usage
-
-Build and install `balboa`. Start a backend and configure `balboa` to use a
-remote backend:
-
-```yaml
-# database.yaml
-database:
-    name: Remote Backend
-    type: remote-backend
-    host: "127.0.0.1:4242"
-```
-
-Fist start build and start the backend, in this case we use the RocksDB backend
+Building the RocksDB backend:
 
 ```
-cd balboa-backends/backend-rocksdb
-go build
-./backend-rocksdb -h
-./backend-rocksdb
-INFO[0000] opening database path=/tmp/balboa-rocksdb membudget=134217728
-INFO[0000] alloc=7145568 tot=7212080 sys=71956728 lookups=0
-INFO[0000] database opened successfully
-INFO[0000] start listening on host=:4242
+cd backend/balboa/balboa-rocksdb
+make
 ```
 
-Now start *balboa* and feed pDNS observations into the backend
+This yields the backend binary `build/linux/balboa-rocksdb`.
+
+### Usage
+
+Show available parameters to the RocksDB backend:
 
 ```
-balboa serve -l '' -d database.yml -f my-feeders.yaml
+balboa-rocksdb -h
+```
+
+Now start *balboa* and the backend to feed pDNS observations into it:
+
+```
+balboa-rocksdb -p 4242 -h 127.0.0.1 -d /tmp/balboa-rocksdb -D
+balboa serve -l '' -h 127.0.0.1:4242 -f my-feeders.yaml
 ```
 
 ### Other tools
 
-You need the [balboa](https://www.github.colm/DCSO/balboa) frontend to be able
-to communicate with the various backends.
+#### balboa-backend-console
 
+#### balboa-rocksdb-v1-dump
 
 ## Migrating from balboa/rocksdb v1
 
@@ -94,41 +62,24 @@ du -s /data/balboa-rocksdb-v1
 42GB
 ```
 
-Now, we want to migrate this database to balboa v2. First you prepare the new
-balboa frontend to speak to a remote backend:
-
-database.yaml:
-```yaml
-database:
-    name: Remote Backend
-    type: remote-backend
-    host: "127.0.0.1:4242"
-```
-
-The feeder configuration remains the same. Second, start the new balboa backend
-matching the `database.yaml` configuration.
+Now, we want to migrate this database to balboa v2. The feeder configuration
+remains the same. Start the new balboa backend and frontend.
 
 ```
-backend-rocksdb -path /data/balboa-rocksdb-v2 -host :4242
+balboa-rocksdb -d /data/balboa-rocksdb-v2 -h 127.0.0.1 -p 4242
+balboa serve -l '' -f my-feeders.yaml -p 4242 -h 127.0.0.1
 ```
 
-Stop the old monolithic balboa v1 service and immediately start the new one
+Stop the old balboa v1 service and dump the database:
 
 ```
-balboa serve -l '' -f my-feeders.yaml
+babloa-rocksdb-v1-dump dump /data/balboa-rocksdb | lz4 > /data/pdns-backup.dmp.lz4
+lz4cat /data/pdns-backup.dmp.lz4 | balboa-backend-console replay -h 127.0.0.1 -p 4242
 ```
 
-Now we get all current observations inserted into the database. But we also
-want all the old observations be migrated to the new one. We can do this using
-the `dump-rocksdb-v1` and `dump` tools:
-
-```
-dump-rocksdb-v1 dump /data/balboa-rocksdb-v2 | dump replay -h 127.0.0.1 -p 4242 -d -
-```
-
-`dump-rocksdb-v1` will dump the observation entries to stdout which in turn
-gets redirected to the `dump` tool in `replay` mode (`-d -` tells `dump` to
-read from stdin instead of a file).
+`babloa-rocksdb-v1-dump` will dump the observation entries to stdout which in
+turn gets redirected to the `balboa-backend-console` tool in `replay` mode
+(reading from stdin in this case, use -d <path> to read from dump file)
 
 Wait some time. Done.
 
