@@ -45,7 +45,34 @@ balboa serve -l '' -h 127.0.0.1:4242 -f my-feeders.yaml
 
 #### balboa-backend-console
 
+`balboa-backend-console` is a small utility managing balboa backends. It speaks
+the *backend protocol* directly. You can `backup`, `dump` and `replay`
+databases. Building is as easy as:
+
+```
+cd backend/balboa-backend-console
+make
+```
+
+assuming `make` and `gcc` are working on your system. It drops the self
+contained binary `build/linux/balboa-backend-console`.
+
+```
+balboa-backend-console -h
+```
+
 #### balboa-rocksdb-v1-dump
+
+`balboa-rocksdb-v1-dump` is a small utility dealing with migration from
+*balboa* v1 databases to the new and internal format of v2.
+
+```
+cd backend/balboa-rocksdb-v1-dump
+make
+```
+
+if successfull the binary is located under
+`build/linux/balboa-rocksdb-v1-dump`.
 
 ## Migrating from balboa/rocksdb v1
 
