@@ -100,7 +100,7 @@ balboa serve -l '' -f my-feeders.yaml -p 4242 -h 127.0.0.1
 Stop the old balboa v1 service and dump the database:
 
 ```
-babloa-rocksdb-v1-dump dump /data/balboa-rocksdb | lz4 > /data/pdns-backup.dmp.lz4
+balboa-rocksdb-v1-dump dump /data/balboa-rocksdb | lz4 > /data/pdns-backup.dmp.lz4
 lz4cat /data/pdns-backup.dmp.lz4 | balboa-backend-console replay -h 127.0.0.1 -p 4242
 ```
 
