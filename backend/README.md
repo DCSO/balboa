@@ -44,7 +44,7 @@ Now start *balboa* and the backend to feed pDNS observations into it:
 
 ```
 balboa-rocksdb -p 4242 -h 127.0.0.1 -d /tmp/balboa-rocksdb -D
-balboa serve -l '' -h 127.0.0.1:4242 -f my-feeders.yaml
+balboa serve -l '' -host 127.0.0.1:4242 -f my-feeders.yaml
 ```
 
 ### Other tools
@@ -100,7 +100,7 @@ remains the same. Start the new balboa backend and frontend.
 
 ```
 balboa-rocksdb -d /data/balboa-rocksdb-v2 -h 127.0.0.1 -p 4242
-balboa serve -l '' -f my-feeders.yaml -p 4242 -h 127.0.0.1
+balboa serve -l '' -f my-feeders.yaml -p 4242 -host 127.0.0.1:4242
 ```
 
 Stop the old balboa v1 service and dump the database:
