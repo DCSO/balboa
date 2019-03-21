@@ -51,7 +51,7 @@ int main( int argc,char** argv ){
     trace_config_t trace_config={
         .stream=stderr
        ,.host="pdns"
-       ,.app=argv[0]
+       ,.app="balboa-rocksdb"
        // leaking process number ...
        ,.procid=getpid()
     };
