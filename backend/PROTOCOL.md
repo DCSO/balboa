@@ -24,9 +24,9 @@ struct typed_message{
 }
 ```
 
-dependent on the type field the `payload` field contains the actual *inner*
-[msgpack][1] encoded message (using msgpack encoded data in `encoded_message`
-is not mandatory, could be plain text json as well).
+dependent on the value of the `type` field the `encoded_message` field contains
+the actual *inner* [msgpack][1] encoded message (using msgpack encoded data in
+`encoded_message` is not mandatory, could be plain text json as well).
 
 all messages are delivered asynchronous and are not explicitly ack'ed.
 
@@ -53,15 +53,64 @@ struct input_message{
 
 ## Query Request Message
 
+```
+struct query_request{
+    qrrname: bytestring where field="Qrrname"
+    have_rrname: bool where field="Hrrname"
+    qrdata: bytestring where field="Qrdata"
+    have_qrdata: bool where field="Hrdata"
+    qrrtype: bytestring where field="Qrrtype"
+    have_rrtype: bool where field="Hrrtype"
+    qsensorid: bytestring where field="Qsensorid"
+    have_sensorid: bool where field="Hsensorid"
+    limit: int where field="Limit"
+}
+```
+
 ## Query Response Message
+
+```
+struct query_response{
+    observations: array(observation) where field="O"
+}
+```
 
 ## Query Stream Response Start
 
+```
+struct qurey_stream_start_response{
+}
+```
+
 ## Query Stream Response Data
+
+```
+struct qurey_stream_data_response{
+    embed observation
+}
+```
 
 ## Query Stream Response End
 
+```
+struct qurey_stream_end_response{
+}
+```
+
 ## Dump Request Message
+
+```
+struct dump_request{
+    // currently unused
+    path: bytestring where field="P"
+}
+```
 
 ## Backup Request Message
 
+```
+struct backup_request{
+    // currently unused
+    path: bytestring where field="P"
+}
+```
