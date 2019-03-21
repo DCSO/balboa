@@ -37,7 +37,7 @@ all messages are delivered asynchronous and are not explicitly ack'ed.
 ## Input Request Message
 
 ```
-struct observation{
+struct pdns_entry{
     rrname: bytestring where field="N"
     rdata: bytestring where field="D"
     rrtype: bytestring where field="T"
@@ -47,7 +47,7 @@ struct observation{
     last_seen: timestamp_in_seconds where field="L"
 }
 struct input_message{
-    observations: array(observation) where field="O"
+    observations: array(pdns_entry) where field="O"
 }
 ```
 
@@ -71,7 +71,7 @@ struct query_request{
 
 ```
 struct query_response{
-    observations: array(observation) where field="O"
+    observations: array(pdns_entry) where field="O"
 }
 ```
 
@@ -86,7 +86,7 @@ struct qurey_stream_start_response{
 
 ```
 struct qurey_stream_data_response{
-    embed observation
+    embed pdns_entry
 }
 ```
 
