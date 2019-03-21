@@ -79,6 +79,7 @@ struct query_response{
 
 ```
 struct qurey_stream_start_response{
+    // empty
 }
 ```
 
@@ -94,6 +95,7 @@ struct qurey_stream_data_response{
 
 ```
 struct qurey_stream_end_response{
+    // empty
 }
 ```
 
