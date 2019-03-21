@@ -41,11 +41,12 @@ static void trace_output( trace_t* trace,int priority,const char* fmt,va_list ap
     char b[128];
     size_t len=strftime(b,sizeof(b),"%FT%T%z",&tm);
     fprintf(trace->config.stream
-        ,"<%d>1 %.*s %s %s "
+        ,"<%d>1 %.*s %s %s %d - - "
         ,priority
         ,(int)len,b
         ,trace->config.host
         ,trace->config.app
+        ,trace->config.procid
 
     );
     vfprintf(trace->config.stream,fmt,ap);
