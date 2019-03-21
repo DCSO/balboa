@@ -361,7 +361,7 @@ static int blb_engine_thread_consume_input( thread_t* th,mpack_node_t node ){
 
     char key[1]={'\0'};
     (void)mpack_expect_str_buf(rd,key,1);
-    if( key[0]!=PROTOCOL_INPUT_REQUEST_OBSERVATION_KEY ){
+    if( key[0]!=PROTOCOL_INPUT_REQUEST_OBSERVATION_KEY0 ){
         V(prnl("invalid inner message: observation key expected"));
         goto decode_error;
     }
@@ -387,45 +387,45 @@ static int blb_engine_thread_consume_input( thread_t* th,mpack_node_t node ){
             char key[1]={'\0'};
             (void)mpack_expect_str_buf(rd,key,1);
             switch( key[0] ){
-                case PROTOCOL_INPUT_REQUEST_COUNT_KEY:{
+                case PROTOCOL_PDNS_ENTRY_COUNT_KEY0:{
                     X(prnl("got input request count"));
                     i->count=mpack_expect_int(rd);
                     break;
                 }
-                case PROTOCOL_INPUT_REQUEST_FIRSTSEEN_KEY:{
+                case PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY0:{
                     X(prnl("got input request first seen"));
                     mpack_timestamp_t ts=mpack_expect_timestamp(rd);
                     i->first_seen=ts.seconds;
                     break;
                 }
-                case PROTOCOL_INPUT_REQUEST_LASTSEEN_KEY:{
+                case PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY0:{
                     X(prnl("got input request last seen"));
                     mpack_timestamp_t ts=mpack_expect_timestamp(rd);
                     i->last_seen=ts.seconds;
                     break;
                 }
-                case PROTOCOL_INPUT_REQUEST_RRNAME_KEY:{
+                case PROTOCOL_PDNS_ENTRY_RRNAME_KEY0:{
                     X(prnl("got input request rrname"));
                     i->rrname_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
                     i->rrname=th->scrtch[w];
                     w++;
                     break;
                 }
-                case PROTOCOL_INPUT_REQUEST_RRTYPE_KEY:{
+                case PROTOCOL_PDNS_ENTRY_RRTYPE_KEY0:{
                     X(prnl("got input request rrtype"));
                     i->rrtype_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
                     i->rrtype=th->scrtch[w];
                     w++;
                     break;
                 }
-                case PROTOCOL_INPUT_REQUEST_RDATA_KEY:{
+                case PROTOCOL_PDNS_ENTRY_RDATA_KEY0:{
                     X(prnl("got input request rdata"));
                     i->rdata_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
                     i->rdata=th->scrtch[w];
                     w++;
                     break;
                 }
-                case PROTOCOL_INPUT_REQUEST_SENSORID_KEY:{
+                case PROTOCOL_PDNS_ENTRY_SENSORID_KEY0:{
                     X(prnl("got input request sensorid"));
                     i->sensorid_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
                     i->sensorid=th->scrtch[w];
@@ -633,21 +633,21 @@ int blb_thread_query_stream_push_response( thread_t* th,const entry_t* entry ){
     //encode inner message
     mpack_writer_init(wr,(char*)th->scrtch_response_inner,ENGINE_MAX_MESSAGE_SZ);
     mpack_start_map(wr,7);
-        mpack_write_cstr(wr,PROTOCOL_QUERY_STREAM_DATA_RESPONSE_COUNT_KEY);
+        mpack_write_cstr(wr,PROTOCOL_PDNS_ENTRY_COUNT_KEY);
         mpack_write_uint(wr,entry->count);
-        mpack_write_cstr(wr,PROTOCOL_QUERY_STREAM_DATA_RESPONSE_FIRSTSEEN_KEY);
+        mpack_write_cstr(wr,PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY);
         //mpack_write_timestamp_seconds(wr,entry->first_seen);
         mpack_write_uint(wr,entry->first_seen);
-        mpack_write_cstr(wr,PROTOCOL_QUERY_STREAM_DATA_RESPONSE_LASTSEEN_KEY);
+        mpack_write_cstr(wr,PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY);
         //mpack_write_timestamp_seconds(wr,entry->last_seen);
         mpack_write_uint(wr,entry->last_seen);
-        mpack_write_cstr(wr,PROTOCOL_QUERY_STREAM_DATA_RESPONSE_RDATA_KEY);
+        mpack_write_cstr(wr,PROTOCOL_PDNS_ENTRY_RDATA_KEY);
         mpack_write_str(wr,entry->rdata,entry->rdata_len);
-        mpack_write_cstr(wr,PROTOCOL_QUERY_STREAM_DATA_RESPONSE_RRNAME_KEY);
+        mpack_write_cstr(wr,PROTOCOL_PDNS_ENTRY_RRNAME_KEY);
         mpack_write_str(wr,entry->rrname,entry->rrname_len);
-        mpack_write_cstr(wr,PROTOCOL_QUERY_STREAM_DATA_RESPONSE_RRTYPE_KEY);
+        mpack_write_cstr(wr,PROTOCOL_PDNS_ENTRY_RRTYPE_KEY);
         mpack_write_str(wr,entry->rrtype,entry->rrtype_len);
-        mpack_write_cstr(wr,PROTOCOL_QUERY_STREAM_DATA_RESPONSE_SENSORID_KEY);
+        mpack_write_cstr(wr,PROTOCOL_PDNS_ENTRY_SENSORID_KEY);
         mpack_write_str(wr,entry->sensorid,entry->sensorid_len);
     mpack_finish_map(wr);
     if( mpack_writer_error(wr)!=mpack_ok ){
