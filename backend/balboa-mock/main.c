@@ -5,6 +5,7 @@
 #include <ketopt.h>
 #include <mock.h>
 #include <trace.h>
+#include <unistd.h>
 
 int main( int argc,char** argv ){
     int verbosity=0;
@@ -12,6 +13,13 @@ int main( int argc,char** argv ){
     char* host="127.0.0.1";
     int port=4242;
     int thread_throttle_limit=64;
+    trace_config_t trace_config={
+        .stream=stderr
+       ,.host="pdns"
+       ,.app=argv[0]
+       // leaking process number ...
+       ,.procid=getpid()
+    };
     ketopt_t opt=KETOPT_INIT;
     int c;
     while( (c=ketopt(&opt,argc,argv,1,"j:l:p:vD",NULL))>=0 ){
@@ -25,8 +33,7 @@ int main( int argc,char** argv ){
         }
     }
 
-    theTrace_stdout_use();
-    theTrace_init();
+    theTrace_stream_use(&trace_config);
     if( daemonize ){ theTrace_set_verbosity(0); }
     else{ theTrace_set_verbosity(verbosity); }
 

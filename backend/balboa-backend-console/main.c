@@ -282,6 +282,13 @@ static int dump_entry_replay_cb( state_t* state,entry_t* entry ){
 
 static int main_jsonize( int argc,char** argv ){
     const char* db="-";
+    trace_config_t trace_config={
+        .stream=stderr
+       ,.host="pdns"
+       ,.app="balboa-backend-console"
+       // leaking process number ...
+       ,.procid=getpid()
+    };
     ketopt_t opt=KETOPT_INIT;
     int c;
     while( (c=ketopt(&opt,argc,argv,1,"r:v",NULL))>=0 ){
@@ -292,8 +299,7 @@ static int main_jsonize( int argc,char** argv ){
         }
     }
 
-    theTrace_stderr_use();
-    theTrace_init();
+    theTrace_stream_use(&trace_config);
     theTrace_set_verbosity(verbosity);
 
     V(prnl("dump file is `%s`",db));
@@ -372,6 +378,13 @@ static int main_dump( int argc,char** argv ){
     const char* host="127.0.0.1";
     const char* port="4242";
     const char* remote_path="-";
+    trace_config_t trace_config={
+        .stream=stderr
+       ,.host="pdns"
+       ,.app="balboa-backend-console"
+       // leaking process number ...
+       ,.procid=getpid()
+    };
     ketopt_t opt=KETOPT_INIT;
     int c;
     while( (c=ketopt(&opt,argc,argv,1,"h:p:v:r:",NULL))>=0 ){
@@ -384,8 +397,7 @@ static int main_dump( int argc,char** argv ){
         }
     }
 
-    theTrace_stderr_use();
-    theTrace_init();
+    theTrace_stream_use(&trace_config);
     theTrace_set_verbosity(verbosity);
 
     V(prnl("host `%s` port `%s` remote_path `%s`",host,port,remote_path));
@@ -441,6 +453,13 @@ static int main_replay( int argc,char** argv ){
     const char* host="127.0.0.1";
     const char* port="4242";
     const char* db="/tmp/balboa";
+    trace_config_t trace_config={
+        .stream=stderr
+       ,.host="pdns"
+       ,.app="balboa-backend-console"
+       // leaking process number ...
+       ,.procid=getpid()
+    };
     ketopt_t opt=KETOPT_INIT;
     int c;
     while( (c=ketopt(&opt,argc,argv,1,"d:h:p:v",NULL))>=0 ){
@@ -453,8 +472,7 @@ static int main_replay( int argc,char** argv ){
         }
     }
 
-    theTrace_stderr_use();
-    theTrace_init();
+    theTrace_stream_use(&trace_config);
     theTrace_set_verbosity(verbosity);
 
     V(fprintf(stderr,"host=%s port=%s db=%s\n",host,port,db));

@@ -4,6 +4,7 @@
 #include <engine.h>
 #include <ketopt.h>
 #include <rocksdb.h>
+#include <unistd.h>
 #include <trace.h>
 
 __attribute__((noreturn)) void version( void ){
@@ -47,7 +48,13 @@ int main( int argc,char** argv ){
     int port=4242;
     int thread_throttle_limit=64;
     blb_rocksdb_config_t config=blb_rocksdb_config_init();
-
+    trace_config_t trace_config={
+        .stream=stderr
+       ,.host="pdns"
+       ,.app=argv[0]
+       // leaking process number ...
+       ,.procid=getpid()
+    };
     ketopt_t opt=KETOPT_INIT;
     static ko_longopt_t opts[]={
         {"membudget",ko_required_argument,301}
@@ -80,8 +87,7 @@ int main( int argc,char** argv ){
         }
     }
 
-    theTrace_stdout_use();
-    theTrace_init();
+    theTrace_stream_use(&trace_config);
     if( daemonize ){ theTrace_set_verbosity(0); }
     else{ theTrace_set_verbosity(verbosity); }
 
