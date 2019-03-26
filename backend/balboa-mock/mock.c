@@ -13,7 +13,6 @@ static void blb_mock_teardown( db_t* _db );
 static db_t* blb_mock_clone( db_t* db );
 static int blb_mock_query( thread_t* th,const query_t* q );
 static int blb_mock_input( thread_t* th,const input_t* i );
-static int blb_mock_input( thread_t* th,const input_t* i );
 static void blb_mock_dump( thread_t* th,const dump_t* d );
 static void blb_mock_backup( thread_t* th,const backup_t* b );
 

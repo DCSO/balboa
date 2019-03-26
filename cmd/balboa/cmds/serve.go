@@ -142,5 +142,5 @@ func init() {
 	serveCmd.Flags().IntP("port", "p", 8080, "port for GraphQL server")
 	serveCmd.Flags().StringP("logfile", "l", "/var/log/balboa.log", "log file path")
 	serveCmd.Flags().BoolP("logjson", "j", true, "output log file as JSON")
-	serveCmd.Flags().StringP("host","h","127.0.0.1:4242", "remote database host and port")
+	serveCmd.Flags().StringP("host", "H", "127.0.0.1:4242", "remote database host and port")
 }

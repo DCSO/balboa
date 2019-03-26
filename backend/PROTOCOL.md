@@ -78,7 +78,7 @@ struct query_response{
 ## Query Stream Response Start
 
 ```
-struct qurey_stream_start_response{
+struct query_stream_start_response{
     // empty
 }
 ```
@@ -86,7 +86,7 @@ struct qurey_stream_start_response{
 ## Query Stream Response Data
 
 ```
-struct qurey_stream_data_response{
+struct query_stream_data_response{
     embed pdns_entry
 }
 ```
@@ -94,7 +94,7 @@ struct qurey_stream_data_response{
 ## Query Stream Response End
 
 ```
-struct qurey_stream_end_response{
+struct query_stream_end_response{
     // empty
 }
 ```

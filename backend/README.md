@@ -100,7 +100,7 @@ remains the same. Start the new balboa backend and frontend.
 
 ```
 balboa-rocksdb -d /data/balboa-rocksdb-v2 -h 127.0.0.1 -p 4242
-balboa serve -l '' -f my-feeders.yaml -p 4242 -host 127.0.0.1:4242
+balboa serve -l '' -f my-feeders.yaml -host 127.0.0.1:4242
 ```
 
 Stop the old balboa v1 service and dump the database:
