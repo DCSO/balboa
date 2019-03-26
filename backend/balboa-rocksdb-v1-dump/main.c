@@ -7,14 +7,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <rocksdb/c.h>
-
+#include <ketopt.h>
 #include <mpack.h>
 #include <tpl.h>
 
-static int verbose=0;
+#include <rocksdb/c.h>
 
-#define V(body) if( verbose>0 ) { do{ body; }while( 0 );}
+static int verbosity=0;
+
+#define V(body) if( verbosity>0 ) { do{ body; }while( 0 );}
 
 #define OBS_SET_STEP_SIZE 1000
 
@@ -445,41 +446,94 @@ static int do_checkpoint( const char* db_path,const char* cp_path ){
     return(0);
 }
 
-int main( int argc,char** argv ){
-    int res=-1;
-    if( argc>2 ){
-        if( strcmp(argv[1],"-v")==0 ) {
-            verbose+=1;
-            argc--;
-            argv++;
+__attribute__((noreturn)) void usage( void ){
+    fprintf(stderr,"\
+`balboa-rocksdb-v1-dump` is a management tool for `balboa-rocksdb` version 1\n\
+\n\
+Usage: balboa-rocksdb-v1-dump <--version|dump|checkpoint> [options]\n\
+\n\
+Command help:\n\
+    show help\n\
+\n\
+Command dump:\n\
+   dump the contents of the rocksdb balboa v1 format to local stdout\n\
+\n\
+    -d <database-path> path to the rocksdb data directory\n\
+    -v increase verbosity; can be passed multiple times\n\
+\n\
+Command checkpoint:\n\
+    checkpoint the given rocksdb database\n\
+\n\
+    -d <live-database-path> path to the rocksdb data directory\n\
+    -c <target-checkpoint-path> target path of the checkpoint to be created\n\
+    -v increase verbosity; can be passed multiple times\n\
+\n\
+Examples:\n\
+\n\
+balboa-rocksdb-v1-dump checkpoint -d /mnt/balboa-rocksdb-live -c /mnt/balboa-rocksdb-checkpoint\n\
+balboa-rocksdb-v1-dump dump -d /mnt/balboa-rocksdb-checkpoint | lz4 > /mnt/backup/balboa.dmp.lz4\n\
+\n\
+\n");
+    exit(1);
+}
+
+__attribute__((noreturn)) void version( void ){
+    fprintf(stderr,"balboa-rocksdb-v1-dump v2.0.0\n");
+    exit(1);
+}
+
+static int main_checkpoint( int argc,char** argv ){
+    ketopt_t opt=KETOPT_INIT;
+    const char* db=NULL;
+    const char* checkpoint=NULL;
+    int c;
+    while( (c=ketopt(&opt,argc,argv,1,"d:c:v",NULL))>=0 ){
+        switch( c ){
+            case 'd': db=opt.arg;break;
+            case 'c': checkpoint=opt.arg;break;
+            case 'v': verbosity+=1;break;
+            default: break;
         }
     }
-    if( argc<3 ){
-        goto usage;
+    if( db==NULL || checkpoint==NULL ){
+        usage();
+    }
+    return(do_checkpoint(db,checkpoint));
+}
+
+static int main_dump( int argc,char** argv ){
+    ketopt_t opt=KETOPT_INIT;
+    const char* db=NULL;
+    int c;
+    while( (c=ketopt(&opt,argc,argv,1,"d:v",NULL))>=0 ){
+        switch( c ){
+            case 'd': db=opt.arg;break;
+            case 'v': verbosity+=1;break;
+            default: break;
+        }
+    }
+    if( db==NULL ){
+        usage();
+    }
+    return(do_dump(db));
+}
+
+int main( int argc,char** argv ){
+    int res=-1;
+    if( argc<2 ){
+        usage();
     }else if( strcmp(argv[1],"checkpoint")==0 ){
-        if( argc<4) { goto usage; }
-        res=do_checkpoint(argv[2],argv[3]);
+        argc--;
+        argv++;
+        res=main_checkpoint(argc,argv);
     }else if( strcmp(argv[1],"dump")==0 ){
-        res=do_dump(argv[2]);
+        argc--;
+        argv++;
+        res=main_dump(argc,argv);
+    }else if( strcmp(argv[1],"--version")==0 ){
+        version();
     }else{
-        goto usage;
+        usage();
     }
     return(res);
-usage:
-    fprintf(stderr,"\n\
-usage:\n\
-\n\
-    dump-rocksdb-v1 [-v] checkpoint <db-path> <checkpoint-path>\n\
-        - create a checkpoint from balboa `db-path`. the checkpoint\n\
-          will be stored at `checkpoint-path` using hard-links if possible\n\
-\n\
-    dump-rocksdb-v1 [-v] dump <checkpoint-path>\n\
-        - dump all pDNS observations in `msgpack` format to stdout\n\
-\n\
-example:\n\
-\n\
-    dump-rocksdb-v1 checkpoint /mnt/balboa-rocksdb-live /mnt/balboa-rocksdb-checkpoint\n\
-    dump-rocksdb-v1 dump /mnt/balboa-rocksdb-checkpoint | xz > /mnt/backup/balboa-dump.xz\n\
-\n");
-    return(1);
 }
