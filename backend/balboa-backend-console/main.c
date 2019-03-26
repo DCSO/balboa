@@ -66,7 +66,7 @@ static inline int dump_entry_decode( mpack_reader_t* rd, entry_t* entry, const b
                 entry->rrtype=(const char*)sink.p;
                 entry->rrtype_len=sz;
                 sink=bs_sink_slice0(&sink,sz);
-                if( sink.p==0 ){return(-1);}
+                if( sink.p==0 ){ return(-1); }
                 break;
             }
             case OBS_RDATA_IDX:{
@@ -74,7 +74,7 @@ static inline int dump_entry_decode( mpack_reader_t* rd, entry_t* entry, const b
                 entry->rdata=(const char*)sink.p;
                 entry->rdata_len=sz;
                 sink=bs_sink_slice0(&sink,sz);
-                if( sink.p==0 ){return(-1);}
+                if( sink.p==0 ){ return(-1); }
                 break;
             }
             case OBS_SENSOR_IDX:{
@@ -82,7 +82,7 @@ static inline int dump_entry_decode( mpack_reader_t* rd, entry_t* entry, const b
                 entry->sensorid=(const char*)sink.p;
                 entry->sensorid_len=sz;
                 sink=bs_sink_slice0(&sink,sz);
-                if( sink.p==0 ){return(-1);}
+                if( sink.p==0 ){ return(-1); }
                 break;
             }
             case OBS_RRNAME_IDX:{
@@ -90,7 +90,7 @@ static inline int dump_entry_decode( mpack_reader_t* rd, entry_t* entry, const b
                 entry->rrname=(const char*)sink.p;
                 entry->rrname_len=sz;
                 sink=bs_sink_slice0(&sink,sz);
-                if( sink.p==0 ){return(-1);}
+                if( sink.p==0 ){ return(-1); }
                 break;
             }
             case OBS_COUNT_IDX:
@@ -103,7 +103,7 @@ static inline int dump_entry_decode( mpack_reader_t* rd, entry_t* entry, const b
                 entry->first_seen=mpack_expect_uint(rd);
                 break;
             default:
-                V(fprintf(stderr,"unknown field index=%u\n",field));
+                L(prnl("unknown field index `%u`",field));
                 return(-1);
         }
     }
@@ -121,21 +121,21 @@ static ssize_t dump_process( state_t* state,FILE* is ){
         mpack_error_t map_ok=mpack_reader_error(rd);
         if( map_ok!=mpack_ok ){
             if( map_ok==mpack_error_eof ){
-                V(fprintf(stderr,"dump finished; eof reached\n"));
+                V(prnl("dump finished; eof reached"));
             }else{
-                fprintf(stderr,"unexpected mpack decode error=%d\n",map_ok);
+                L(prnl("unexpected mpack decode error `%d`",map_ok));
             }
             break;
         }
-        V(fprintf(stderr,"got map with cnt=%d\n",cnt));
+        X(prnl("received map with `%d` entries",cnt));
         if( cnt!=OBS_FIELDS ){
-            fprintf(stderr,"invalid map with #entries=%u; aborting\n",cnt);
+            L(prnl("expected map with `%u` entries but got `%u` entries",OBS_FIELDS,cnt));
             break;
         }
         entry_t __entry={0},*entry=&__entry;
         int entry_ok=dump_entry_decode(rd,entry,&sink);
         if( entry_ok!=0 ){
-            fprintf(stderr,"decoding entry failed; aborting\n");
+            L(prnl("decoding entry failed"));
             break;
         }
         mpack_done_map(rd);
@@ -144,13 +144,13 @@ static ssize_t dump_process( state_t* state,FILE* is ){
             entries++;
             int rc=state->dump_entry_cb(state,entry);
             if( rc!=0 ){
-                fprintf(stderr, "dump_entry_db failed with rc=%d\n",rc);
+                L(prnl("dump_entry_db() failed with rc `%d`",rc));
                 break;
             }
         }
     }
     if( err!=mpack_error_eof ){
-        V(fprintf(stderr,"mpack decode error=%d after entries=%zu\n",err,entries));
+        L(prnl("decode failed with error-code `%d` ( decoded `%zu` entries so far )",err,entries));
     }
     mpack_reader_destroy(rd);
     return(entries);
@@ -159,7 +159,7 @@ static ssize_t dump_process( state_t* state,FILE* is ){
 static int dump( state_t* state,const char* dump_file ){
     ASSERT( state!=NULL );
     ASSERT( state->dump_entry_cb!=NULL );
-    V(fprintf(stderr,"dump file is `%s`\n",dump_file));
+    V(prnl("dump file is `%s`",dump_file));
     FILE* f=NULL;
     if( strcmp(dump_file,"-")==0 ){
         f=stdin;
@@ -167,11 +167,11 @@ static int dump( state_t* state,const char* dump_file ){
         f=fopen(dump_file,"rb");
     }
     if( f==NULL ){
-        fprintf(stderr,"unable to open file `%s`\n",dump_file);
+        L(prnl("unable to open file `%s`",dump_file));
         return(-1);
     }
     ssize_t rc=dump_process(state,f);
-    fprintf(stderr,"processed %zd entries\n",rc);
+    L(prnl("done; processed `%zd` entries",rc));
     dump_state_teardown(state);
     fclose(f);
     if( rc<0 ){ return(-1); }else{ return(0); }
@@ -240,13 +240,13 @@ static int dump_entry_replay_cb( state_t* state,entry_t* entry ){
     mpack_finish_map(wr);
     mpack_error_t err=mpack_writer_error(wr);
     if( err!=mpack_ok ){
-        fprintf(stderr,"encoding inner msgpack data failed err=%d\n",err);
+        L(prnl("encoding inner msgpack data failed with error-code `%d`",err));
         mpack_writer_destroy(wr);
         return(-1);
     }
     size_t used_inner=mpack_writer_buffer_used(wr);
-    V(fprintf(stderr,"encoded inner message size=%zu\n",used_inner));
-    assert( used_inner<state->scrtch1_sz );
+    T(prnl("encoded inner message size `%zu`",used_inner));
+    ASSERT( used_inner<state->scrtch1_sz );
     mpack_writer_destroy(wr);
     //encode outer message
     mpack_writer_init(wr,(char*)state->scrtch2,state->scrtch2_sz);
@@ -258,20 +258,20 @@ static int dump_entry_replay_cb( state_t* state,entry_t* entry ){
     mpack_finish_map(wr);
     mpack_error_t outer_err=mpack_writer_error(wr);
     if( outer_err!=mpack_ok ){
-        fprintf(stderr,"encoding outer msgpack data failed err=%d\n",err);
+        L(prnl("encoding outer msgpack data failed with error-code `%d`",err));
         mpack_writer_destroy(wr);
         return(-1);
     }
     size_t used_outer=mpack_writer_buffer_used(wr);
-    assert( used_outer<state->scrtch1_sz );
-    V(fprintf(stderr,"encoded outer message size=%zu\n",used_outer));
+    ASSERT( used_outer<state->scrtch1_sz );
+    T(prnl("encoded outer message size `%zu`",used_outer));
     mpack_writer_destroy(wr);
     uint8_t* p=state->scrtch2;
     ssize_t r=used_outer;
     while( r>0 ){
         ssize_t rc=write(state->sock,p,r);
         if( rc<0 ){
-            fprintf(stderr,"write() failed error=%s\n",strerror(errno));
+            L(prnl("write() failed error `%s`",strerror(errno)));
             return(-1);
         }else if( rc==0 && errno==EINTR ) { continue; }
         r-=rc;
@@ -281,7 +281,7 @@ static int dump_entry_replay_cb( state_t* state,entry_t* entry ){
 }
 
 static int main_jsonize( int argc,char** argv ){
-    const char* db="-";
+    const char* dump_file="-";
     trace_config_t trace_config={
         .stream=stderr
        ,.host="pdns"
@@ -289,11 +289,12 @@ static int main_jsonize( int argc,char** argv ){
        // leaking process number ...
        ,.procid=getpid()
     };
+
     ketopt_t opt=KETOPT_INIT;
     int c;
-    while( (c=ketopt(&opt,argc,argv,1,"r:v",NULL))>=0 ){
+    while( (c=ketopt(&opt,argc,argv,1,"d:v",NULL))>=0 ){
         switch( c ){
-            case 'r': db=opt.arg;break;
+            case 'd': dump_file=opt.arg;break;
             case 'v': verbosity+=1;break;
             default: break;
         }
@@ -302,17 +303,17 @@ static int main_jsonize( int argc,char** argv ){
     theTrace_stream_use(&trace_config);
     theTrace_set_verbosity(verbosity);
 
-    V(prnl("dump file is `%s`",db));
+    V(prnl("dump file is `%s`",dump_file));
 
     state_t __state={0},*state=&__state;
     int state_ok=dump_state_init(state);
     if( state_ok!=0 ){
-        fprintf(stderr,"unable to initialize the dump state\n");
+        L(prnl("unable to initialize the dump state\n"));
         return(-1);
     }
     state->os=stdout;
     state->dump_entry_cb=dump_entry_json_cb;
-    int rc=dump(state,db);
+    int rc=dump(state,dump_file);
     return(rc);
 }
 
@@ -347,7 +348,7 @@ Command help:\n\
 Command jsonize:\n\
     read a dump file and print all entries as json\n\
 \n\
-    -r <path> path to the dump file to read\n\
+    -d <path> path to the dump file to read\n\
 \n\
 Command dump:\n\
     connect to a `balboa-backend` and request a dump of all data to local stdout\n\
@@ -355,7 +356,7 @@ Command dump:\n\
     -h <host> ip address of the `balboa-backend` (default: 127.0.0.1)\n\
     -p <port> port of the `balboa-backend` (default: 4242)\n\
     -v increase verbosity; can be passed multiple times\n\
-    -r <remote-path> unused (default: -)\n\
+    -d <remote-dump-path> unused/ignored (default: -)\n\
 \n\
 Command replay:\n\
     replay a previously generated database dump\n\
@@ -377,7 +378,7 @@ lz4cat /tmp/pdns.dmp.lz4 | balboa-backend-console jsonize\n\
 static int main_dump( int argc,char** argv ){
     const char* host="127.0.0.1";
     const char* port="4242";
-    const char* remote_path="-";
+    const char* remote_dump_path="-";
     trace_config_t trace_config={
         .stream=stderr
        ,.host="pdns"
@@ -387,12 +388,12 @@ static int main_dump( int argc,char** argv ){
     };
     ketopt_t opt=KETOPT_INIT;
     int c;
-    while( (c=ketopt(&opt,argc,argv,1,"h:p:v:r:",NULL))>=0 ){
+    while( (c=ketopt(&opt,argc,argv,1,"h:p:v:d:",NULL))>=0 ){
         switch( c ){
             case 'h': host=opt.arg;break;
             case 'p': port=opt.arg;break;
             case 'v': verbosity+=1;break;
-            case 'r': remote_path=opt.arg;break;
+            case 'd': remote_dump_path=opt.arg;break;
             default:break;
         }
     }
@@ -400,7 +401,7 @@ static int main_dump( int argc,char** argv ){
     theTrace_stream_use(&trace_config);
     theTrace_set_verbosity(verbosity);
 
-    V(prnl("host `%s` port `%s` remote_path `%s`",host,port,remote_path));
+    V(prnl("host `%s` port `%s` remote_dump_path `%s`",host,port,remote_dump_path));
     int sock=dump_connect(host,port);
     if( sock<0 ){
         L(prnl("unable to connect to backend"));
@@ -409,7 +410,7 @@ static int main_dump( int argc,char** argv ){
 
     char scrtch[1024];
     size_t scrtch_sz=sizeof(scrtch);
-    protocol_dump_request_t req={.path=remote_path};
+    protocol_dump_request_t req={.path=remote_dump_path};
     ssize_t used=blb_protocol_encode_dump_request(&req,scrtch,scrtch_sz);
     if( used<=0 ){
         L(prnl("blb_protocol_encode_dump_request() failed `%zd`",used));
@@ -452,7 +453,7 @@ static int main_dump( int argc,char** argv ){
 static int main_replay( int argc,char** argv ){
     const char* host="127.0.0.1";
     const char* port="4242";
-    const char* db="/tmp/balboa";
+    const char* dump_file="-";
     trace_config_t trace_config={
         .stream=stderr
        ,.host="pdns"
@@ -460,11 +461,12 @@ static int main_replay( int argc,char** argv ){
        // leaking process number ...
        ,.procid=getpid()
     };
+
     ketopt_t opt=KETOPT_INIT;
     int c;
     while( (c=ketopt(&opt,argc,argv,1,"d:h:p:v",NULL))>=0 ){
         switch( c ){
-            case 'd': db=opt.arg;break;
+            case 'd': dump_file=opt.arg;break;
             case 'h': host=opt.arg;break;
             case 'p': port=opt.arg;break;
             case 'v': verbosity+=1;break;
@@ -475,21 +477,21 @@ static int main_replay( int argc,char** argv ){
     theTrace_stream_use(&trace_config);
     theTrace_set_verbosity(verbosity);
 
-    V(fprintf(stderr,"host=%s port=%s db=%s\n",host,port,db));
+    V(prnl("host `%s` port `%s` dump_file `%s`",host,port,dump_file));
     int sock=dump_connect(host,port);
     if( sock<0 ){
-        fprintf(stderr,"unable to connect to backend\n");
+        L(prnl("unable to connect to backend"));
         return(-1);
     }
     state_t __state={0},*state=&__state;
     int state_ok=dump_state_init(state);
     if( state_ok!=0 ){
-        fprintf(stderr,"unable to initialize the dump state\n");
+        L(prnl("unable to initialize the dump state"));
         return(-1);
     }
     state->sock=sock;
     state->dump_entry_cb=dump_entry_replay_cb;
-    int rc=dump(state,db);
+    int rc=dump(state,dump_file);
     return(rc);
 }
 
