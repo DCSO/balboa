@@ -9,7 +9,6 @@ EnvironmentFile=-/etc/default/balboa
 ExecStart=/usr/bin/balboa serve $BALBOA_ARGS
 ExecStop=/usr/bin/pkill balboa
 PIDFile=/var/run/balboa/balboa.pid
-LimitNOFILE=200000
 Restart=on-failure
 RestartSec=5
 
