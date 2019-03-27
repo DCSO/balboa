@@ -66,6 +66,9 @@ answering queries.`,
 
 		// connect to backend
 		host, err := cmd.Flags().GetString("host")
+		if err != nil {
+			log.Fatal(err)
+		}
 		db.ObservationDB, err = db.MakeRemoteBackend(host, true)
 		if err != nil {
 			log.Fatal(err)
@@ -92,17 +95,17 @@ answering queries.`,
 
 		// Start processing submissions
 		consumeDone := make(chan bool, 1)
-		go func () {
+		go func() {
 			for {
 				select {
-					case <-consumeDone:
-						log.Infof("ConsumeFeed() done")
-						return
-					default:
-						log.Infof("ConsumeFeed() starting")
-						db.ObservationDB.ConsumeFeed(observation.InChan)
-						log.Info("ConsumeFeed() finished")
-						time.Sleep(10*time.Second)
+				case <-consumeDone:
+					log.Infof("ConsumeFeed() done")
+					return
+				default:
+					log.Infof("ConsumeFeed() starting")
+					db.ObservationDB.ConsumeFeed(observation.InChan)
+					log.Info("ConsumeFeed() finished")
+					time.Sleep(10 * time.Second)
 				}
 			}
 		}()

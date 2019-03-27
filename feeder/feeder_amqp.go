@@ -167,7 +167,7 @@ func (f *AMQPFeeder) NewConsumerWithReconnector(amqpURI string, exchanges []stri
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("Queue Declare: %s", err)
+			return fmt.Errorf("error queue declare: %s", err)
 		}
 		log.Debugf("declared Queue (%q %d messages, %d consumers), binding to Exchange (key %q)",
 			queue.Name(), queue.Messages(), queue.Consumers(), key)
@@ -182,11 +182,11 @@ func (f *AMQPFeeder) NewConsumerWithReconnector(amqpURI string, exchanges []stri
 					"noWait": false,
 				},
 			); err != nil {
-				return fmt.Errorf("Queue Bind: %s", err)
+				return fmt.Errorf("error queue bind: %s", err)
 			}
 		}
 
-		log.Debugf("Queue bound to Exchange, starting Consume (consumer tag %q)", c.tag)
+		log.Debugf("queue bound to Exchange, starting Consume (consumer tag %q)", c.tag)
 		c.deliveries, err = c.channel.Consume(
 			queue.Name(),
 			c.tag,
@@ -198,10 +198,10 @@ func (f *AMQPFeeder) NewConsumerWithReconnector(amqpURI string, exchanges []stri
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("Queue Consume: %s", err)
+			return fmt.Errorf("error queue consume: %s", err)
 		}
 
-		log.Debugf("Consumer established connection to %s", s.URL)
+		log.Debugf("consumer established connection to %s", s.URL)
 		s.stop = make(chan bool)
 		c.ErrorChan = make(chan wabbit.Error)
 
@@ -240,7 +240,7 @@ func (f *AMQPFeeder) NewConsumer(amqpURI string, exchanges []string, exchangeTyp
 func (c *Consumer) Shutdown() error {
 	// will close() the deliveries channel
 	if err := c.channel.Close(); err != nil {
-		return fmt.Errorf("Channel close failed: %s", err)
+		return fmt.Errorf("channel close failed: %s", err)
 	}
 	if err := c.conn.Close(); err != nil {
 		return fmt.Errorf("AMQP connection close error: %s", err)

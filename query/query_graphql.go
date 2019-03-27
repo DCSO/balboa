@@ -201,16 +201,6 @@ type GraphQLFrontend struct {
 // Resolver is just used to bundle top level methods.
 type Resolver struct{}
 
-type entryInputArgs struct {
-	Count     int
-	FirstSeen int
-	LastSeen  int
-	RRType    string
-	RRName    string
-	RData     string
-	SensorID  string
-}
-
 // Entries returns a collection of Entry resolvers, given parameters such as
 // Rdata, RRname, RRtype and sensor ID.
 func (r *Resolver) Entries(args struct {
@@ -300,7 +290,7 @@ func (r *Resolver) Stats() (*StatsResolver, error) {
 
 // StatsResolver is a resolver for the Stats type.
 type StatsResolver struct {
-	totalCount int32
+	//totalCount int32
 }
 
 // TotalCount returns the total number of keys in the database.
@@ -376,7 +366,7 @@ func (r *EntryResolver) SensorID() *string {
 
 // Aliases returns resolvers for Entries with the same IPs in Rdata (for
 // A/AAAA type entries).
-func (r *EntryResolver) Aliases(args struct {Limit int32}) *[]*EntryResolver {
+func (r *EntryResolver) Aliases(args struct{ Limit int32 }) *[]*EntryResolver {
 	l := make([]*EntryResolver, 0)
 	if !(r.entry.RRType == "A" || r.entry.RRType == "AAAA") {
 		return nil

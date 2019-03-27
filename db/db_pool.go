@@ -61,7 +61,7 @@ func (p *Pool) Get() (net.Conn, error) {
 	for {
 		select {
 		case v := <-p.store:
-			if p.Ping != nil && p.Ping(v) == false {
+			if p.Ping != nil && !p.Ping(v) {
 				continue
 			}
 			return v, nil
