@@ -773,7 +773,7 @@ rocksdb_t* blb_rocksdb_handle( db_t* _db ){
     return(db->db);
 }
 
-db_t* blb_rocksdb_open( blb_rocksdb_config_t* c ){
+db_t* blb_rocksdb_open( const blb_rocksdb_config_t* c ){
     V(
         prnl("rocksdb database at `%s`",c->path);
         prnl("parallelism `%d` membudget `%zu` max_log_file_size `%zu` keep_log_file_num `%d`"

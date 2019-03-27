@@ -35,6 +35,6 @@ static inline blb_rocksdb_config_t blb_rocksdb_config_init( ){
     );
 }
 
-db_t* blb_rocksdb_open( blb_rocksdb_config_t* config );
+db_t* blb_rocksdb_open( const blb_rocksdb_config_t* config );
 
 #endif
