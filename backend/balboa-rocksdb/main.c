@@ -30,7 +30,9 @@ Usage: balboa-rocksdb [options]\n\
     --max_log_file_size <size> rocksdb log file size option (value: %"PRIu64")\n\
     --max_open_files <number> rocksdb max number of open files (value: %d)\n\
     --keep_log_file_num <number> rocksdb max number of log files (value: %d)\n\
-    --database_path <path> same as `-d`\n"
+    --database_path <path> same as `-d`\n\
+    --version show version then exit\n\
+\n"
 ,c->path
 ,c->membudget
 ,c->parallelism

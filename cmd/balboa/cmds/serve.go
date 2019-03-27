@@ -96,12 +96,12 @@ answering queries.`,
 			for {
 				select {
 					case <-consumeDone:
-						log.Warnf("ConsumeFeed() done")
+						log.Infof("ConsumeFeed() done")
 						return
 					default:
-						log.Warnf("ConsumeFeed() starting")
+						log.Infof("ConsumeFeed() starting")
 						db.ObservationDB.ConsumeFeed(observation.InChan)
-						log.Warnf("ConsumeFeed() finished")
+						log.Info("ConsumeFeed() finished")
 						time.Sleep(10*time.Second)
 				}
 			}

@@ -370,8 +370,8 @@ Examples:\n\
 \n\
 balboa-backend-console jsonize -r /tmp/pdns.dmp\n\
 lz4cat /tmp/pdns.dmp.lz4 | balboa-backend-console jsonize\n\
-\n\
-\n");
+\n"
+    );
     exit(1);
 }
 

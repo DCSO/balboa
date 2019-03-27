@@ -1,8 +1,8 @@
 // balboa
 // Copyright (c) 2018, 2019 DCSO GmbH
 
-#ifndef __ROCKSDB_H
-#define __ROCKSDB_H
+#ifndef __MOCK_H
+#define __MOCK_H
 
 #include <stdbool.h>
 #include <stdint.h>

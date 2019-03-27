@@ -20,6 +20,7 @@ int main( int argc,char** argv ){
        // leaking process number ...
        ,.procid=getpid()
     };
+
     ketopt_t opt=KETOPT_INIT;
     int c;
     while( (c=ketopt(&opt,argc,argv,1,"j:l:p:vD",NULL))>=0 ){

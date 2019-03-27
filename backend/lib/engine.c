@@ -71,6 +71,7 @@ static inline int blb_engine_poll_write( int fd,int seconds ){
 }
 
 static inline int blb_engine_poll_read( int fd,int seconds ){
+timeout_retry:
     if( blb_engine_poll_stop()>0 ){
         V(prnl("engine stop detected"));
         return(-1);
@@ -84,7 +85,7 @@ static inline int blb_engine_poll_read( int fd,int seconds ){
     int rc=select(fd+1,&fds,NULL,NULL,&to);
     if( rc==0 ){
         X(prnl("select() timeout"));
-        return(-1);
+        goto timeout_retry;
     }else if( rc<0 ){
         X(prnl("select() failed `%s`",strerror(errno)));
         return(-1);
