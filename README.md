@@ -39,7 +39,16 @@ The balboa software...
 $ go get github.com/DCSO/balboa
 ```
 
-Dependencies:
+To build the backends:
+
+```
+$ cd $GOPATH/src/github.com/DCSO/balboa/backends
+$ make
+```
+
+This will create a binary executable in the `build/` subdirectories of each backends directory.
+
+### Dependencies
 
 - Go 1.7 or later
 - [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
@@ -95,15 +104,15 @@ are unique.
 ### Configuring the database backend
 
 Multiple database backends are supported to store pDNS observations
-persistently. Each database backend is provided as a self contained binary
+persistently. Each database backend is provided as a self-contained binary
 (executable). The frontend connects to exactly one database backend. The
-backend however supports multiple client or frontend connections.
+backend, however, supports multiple client or frontend connections.
 
-### Running the backend, frontend and consuming input
+### Running the backend and frontend services, consuming input
 
-All interaction with the service on the command line takes place via the
+All interaction with the frontend on the command line takes place via the
 `balboa` frontend executable. The frontend depends on a backend service. E.g
-the RocksDB backend can be startet using:
+the RocksDB backend can be started using:
 
 ```
 $ balboa-rocksdb -h
@@ -226,8 +235,6 @@ Example:
     time_last_rfc3339
     aliases {
       rrname
-      time_first_rfc3339
-      time_last_rfc3339
     }
   }
 }
