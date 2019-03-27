@@ -70,14 +70,14 @@ const (
 	  TXT
 	  URI
 	}
-	
-	# A single observation, unique for the combination of sensor, rrname, 
+
+	# A single observation, unique for the combination of sensor, rrname,
 	# rdata and rrtype. Corresponds, roughly, to a pDNS COF item, but with
 	# additional Aliases (linked via IP in A/AAAA records).
 	type Entry {
 		# The number of observed occurrences of this observation.
 		count: Int!
-		
+
 		# The RRName seen in this observation.
 		rrname: String!
 
@@ -104,7 +104,7 @@ const (
 
 		# Entries referencing the same IP (for A/AAAA) observed on the same
 		# sensor.
-		aliases: [LeafEntry]
+		aliases(limit: Int = 1000): [LeafEntry]
 	}
 
 	# A single observation, unique for the combination of sensor, rrname,
@@ -169,14 +169,14 @@ const (
 		# Number of concurrent goroutines in the server instance.
 		num_goroutines: Int!
 	}
-	
+
 	type Query {
 		# Returns a set of observations satisfying the given query parameters.
 		# Providing rdata, rrname, rrtype and/or sensor_id will restrict the
 		# results to the set of observations that match all of the given
 		# constraints.
-		entries(rdata: String, rrname: String, rrtype: RRType, sensor_id: String): [Entry]
-		
+		entries(rdata: String, rrname: String, rrtype: RRType, sensor_id: String, limit: Int = 1000): [Entry]
+
 		# Returns some runtime values describing the current state of the database.
 		stats(): Stats
 	}
@@ -184,7 +184,7 @@ const (
 	type Mutation {
 		announceObservation(observation: EntryInput!): Entry!
 	}
-	
+
 	schema {
 		query: Query
 		mutation: Mutation
@@ -218,6 +218,7 @@ func (r *Resolver) Entries(args struct {
 	Rrname   *string
 	Rrtype   *string
 	SensorID *string
+	Limit    int32
 }) (*[]*EntryResolver, error) {
 	startTime := time.Now()
 	defer func() {
@@ -251,7 +252,7 @@ func (r *Resolver) Entries(args struct {
 			Message: "at least one of the 'rdata' or 'rrname' parameters is required",
 		}
 	}
-	results, err := db.ObservationDB.Search(args.Rdata, args.Rrname, args.Rrtype, args.SensorID)
+	results, err := db.ObservationDB.Search(args.Rdata, args.Rrname, args.Rrtype, args.SensorID, int(args.Limit))
 	if err != nil {
 		return nil, err
 	}
@@ -375,12 +376,12 @@ func (r *EntryResolver) SensorID() *string {
 
 // Aliases returns resolvers for Entries with the same IPs in Rdata (for
 // A/AAAA type entries).
-func (r *EntryResolver) Aliases() *[]*EntryResolver {
+func (r *EntryResolver) Aliases(args struct {Limit int32}) *[]*EntryResolver {
 	l := make([]*EntryResolver, 0)
 	if !(r.entry.RRType == "A" || r.entry.RRType == "AAAA") {
 		return nil
 	}
-	results, err := db.ObservationDB.Search(&r.entry.RData, nil, nil, &r.entry.SensorID)
+	results, err := db.ObservationDB.Search(&r.entry.RData, nil, nil, &r.entry.SensorID, int(args.Limit))
 	if err != nil {
 		return nil
 	}

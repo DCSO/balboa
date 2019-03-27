@@ -14,5 +14,5 @@ type DB interface {
 	ConsumeFeed(chan observation.InputObservation)
 	Shutdown()
 	TotalCount() (int, error)
-	Search(*string, *string, *string, *string) ([]observation.Observation, error)
+	Search(*string, *string, *string, *string, int) ([]observation.Observation, error)
 }
