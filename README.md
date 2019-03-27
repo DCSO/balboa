@@ -26,24 +26,27 @@ The balboa software...
   - Unix socket
 - accepts various (text-based) input formats
   - JSON-based
-      - [FEVER](https://github.com/DCSO/fever)
-      - [gopassivedns](https://github.com/Phillipmartin/gopassivedns)
-      - [Packetbeat](https://www.elastic.co/guide/en/beats/packetbeat/master/packetbeat-dns-options.html) (via Logstash)
-      - [Suricata EVE DNS v1 and v2](http://suricata.readthedocs.io/en/latest/output/eve/eve-json-format.html#event-type-dns)
+    - [FEVER](https://github.com/DCSO/fever)
+    - [gopassivedns](https://github.com/Phillipmartin/gopassivedns)
+    - [Packetbeat](https://www.elastic.co/guide/en/beats/packetbeat/master/packetbeat-dns-options.html) (via
+      Logstash)
+    - [Suricata EVE DNS v1 and v2](http://suricata.readthedocs.io/en/latest/output/eve/eve-json-format.html#event-type-dns)
   - flat file
-      - Edward Fjellskål's [PassiveDNS](https://github.com/gamelinux/passivedns) tabular format (default order `-f SMcsCQTAtn`)
+    - Edward Fjellskål's [PassiveDNS](https://github.com/gamelinux/passivedns) tabular format (default order `-f SMcsCQTAtn`)
 
 ## Building and Installation
 
-```
+```text
 $ go get github.com/DCSO/balboa
+...
 ```
 
 To build the backends:
 
-```
+```text
 $ cd $GOPATH/src/github.com/DCSO/balboa/backends
 $ make
+...
 ```
 
 This will create a binary executable in the `build/` subdirectories of each backends directory.
@@ -55,8 +58,9 @@ This will create a binary executable in the `build/` subdirectories of each back
 
 On Debian (testing and stretch-backports), one can satisfy these dependencies with:
 
-```
-apt install golang-go librocksdb-dev
+```text
+% apt install golang-go librocksdb-dev
+...
 ```
 
 ## Usage
@@ -114,7 +118,7 @@ All interaction with the frontend on the command line takes place via the
 `balboa` frontend executable. The frontend depends on a backend service. E.g
 the RocksDB backend can be started using:
 
-```
+```text
 $ balboa-rocksdb -h
 `balboa-rocksdb` provides a pdns database backend for `balboa`
 
@@ -140,7 +144,7 @@ $ balboa-rocksdb --database_path /data/pdns -l 127.0.0.1 -p 4242
 
 After starting the backend the `balboa` frontend can be started as follows:
 
-```
+```text
 $ balboa serve -l '' --host 127.0.0.1:4242
 INFO[0000] starting feeder AMQPInput2
 INFO[0000] starting feeder HTTP Input
@@ -157,18 +161,24 @@ one might do some of the following to test data consumption (assuming the
 feeders above are used):
 
 - for AMQP:
-    ```
+
+    ```text
     $ scripts/mkjson.py | rabbitmqadmin publish routing_key="" exchange=tdh.pdns
+    ...
     ```
 
 - for HTTP:
-    ```
+
+    ```text
     $ scripts/mkjson.py | curl -d@- -qs --header "X-Sensor-ID: abcde" http://localhost:8081/submit
+    ...
     ```
 
 - for socket:
-    ```
+
+    ```text
     $ sudo gopassivedns -dev eth0 | socat /tmp/balboa.sock STDIN
+    ...
     ```
 
 ### Querying the server
@@ -276,7 +286,7 @@ There is also a shortcut tool to make 'bulk' querying easier. For example, to
 get all the information on the hosts in range 1.2.0.0/16 as observed by sensor
 `abcde`, one can use:
 
-```
+```text
 $ balboa query --sensor abcde 1.2.0.0/16
 {"count":6,"time_first":1531943211,"time_last":1531949570,"rrtype":"A","rrname":"test.foobar.de","rdata":"1.2.3.4","sensor_id":"abcde"}
 {"count":1,"time_first":1531943215,"time_last":1531949530,"rrtype":"A","rrname":"baz.foobar.de","rdata":"1.2.3.7","sensor_id":"abcde"}

@@ -1,11 +1,11 @@
 
 # `balboa` Frontend <-> Backend (ad-hoc) Protocol
 
-all messges between the frontend and backend are encoded using the [msgpack][1]
+All messges between the frontend and backend are encoded using the [msgpack][1]
 format. We use a *double* encoding of *outer* and *inner* messages to be
 able to add compression and authentication later on.
 
-```
+```text
 enum typed_message_id(int){
     PROTOCOL_INPUT_REQUEST=1
     PROTOCOL_QUERY_REQUEST=2
@@ -24,11 +24,11 @@ struct typed_message{
 }
 ```
 
-dependent on the value of the `type` field the `encoded_message` field contains
+Depending on the value of the `type` field, the `encoded_message` field contains
 the actual *inner* [msgpack][1] encoded message (using msgpack encoded data in
 `encoded_message` is not mandatory, could be plain text json as well).
 
-all messages are delivered asynchronous and are not explicitly ack'ed.
+All messages are delivered in an asynchronous fashion and are not explicitly ack'ed.
 
 [1]: https://msgpack.org/
 
@@ -36,7 +36,7 @@ all messages are delivered asynchronous and are not explicitly ack'ed.
 
 ## Input Request Message
 
-```
+```text
 struct pdns_entry{
     rrname: bytestring where field="N"
     rdata: bytestring where field="D"
@@ -53,7 +53,7 @@ struct input_message{
 
 ## Query Request Message
 
-```
+```text
 struct query_request{
     qrrname: bytestring where field="Qrrname"
     have_rrname: bool where field="Hrrname"
@@ -69,7 +69,7 @@ struct query_request{
 
 ## Query Response Message
 
-```
+```text
 struct query_response{
     observations: array(pdns_entry) where field="O"
 }
@@ -77,7 +77,7 @@ struct query_response{
 
 ## Query Stream Response Start
 
-```
+```text
 struct query_stream_start_response{
     // empty
 }
@@ -85,7 +85,7 @@ struct query_stream_start_response{
 
 ## Query Stream Response Data
 
-```
+```text
 struct query_stream_data_response{
     embed pdns_entry
 }
@@ -93,7 +93,7 @@ struct query_stream_data_response{
 
 ## Query Stream Response End
 
-```
+```text
 struct query_stream_end_response{
     // empty
 }
@@ -101,7 +101,7 @@ struct query_stream_end_response{
 
 ## Dump Request Message
 
-```
+```text
 struct dump_request{
     // currently unused
     path: bytestring where field="P"
@@ -110,7 +110,7 @@ struct dump_request{
 
 ## Backup Request Message
 
-```
+```text
 struct backup_request{
     // currently unused
     path: bytestring where field="P"
