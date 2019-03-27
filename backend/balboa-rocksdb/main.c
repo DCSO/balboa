@@ -3,7 +3,7 @@
 
 #include <engine.h>
 #include <ketopt.h>
-#include <rocksdb.h>
+#include <rocksdb-impl.h>
 #include <unistd.h>
 #include <trace.h>
 

@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <rocksdb.h>
+#include <rocksdb-impl.h>
 
 static void blb_rocksdb_teardown( db_t* _db );
 static db_t* blb_rocksdb_clone( db_t* db );
