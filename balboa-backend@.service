@@ -6,7 +6,7 @@ Before=balboa.service
 
 [Service]
 SyslogIdentifier=balboa-%i
-EnvironmentFile=-/etc/default/balboa-backend
+EnvironmentFile=-/etc/default/balboa-%i
 ExecStart=/usr/bin/balboa-%i $BALBOA_BACKEND_ARGS
 ExecStop=/usr/bin/pkill balboa-%i
 PIDFile=/var/run/balboa/balboa-%i.pid
