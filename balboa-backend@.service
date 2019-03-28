@@ -1,0 +1,18 @@
+[Unit]
+Description=Basic Little Book of Answers, '%i' Backend
+Documentation=https://github.com/DCSO/balboa
+After=network.target
+Before=balboa.service
+
+[Service]
+SyslogIdentifier=balboa-%i
+EnvironmentFile=-/etc/default/balboa-%i
+ExecStart=/usr/bin/balboa-%i $BALBOA_BACKEND_ARGS
+ExecStop=/usr/bin/pkill balboa-%i
+PIDFile=/var/run/balboa/balboa-%i.pid
+LimitNOFILE=200000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target balboa.service
