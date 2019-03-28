@@ -818,7 +818,7 @@ engine_t* blb_engine_new( db_t* db,const char* name,int port,int thread_throttle
     return(e);
 }
 
-static void* blb_engine_sigint_consume( void* usr ){
+static void* blb_engine_signal_consume( void* usr ){
     (void)usr;
     sigset_t s;
     sigemptyset(&s);
@@ -827,6 +827,7 @@ static void* blb_engine_sigint_consume( void* usr ){
     sigaddset(&s,SIGUSR2);
     sigaddset(&s,SIGINT);
     sigaddset(&s,SIGPIPE);
+    sigaddset(&s,SIGTERM);
     V(prnl("signal consumer thread started"));
     //int unblock_ok=pthread_sigmask(SIG_UNBLOCK,s,NULL);
     //V(prnl("pthread_sigmask returned `%d`",unblock_ok));
@@ -837,13 +838,17 @@ static void* blb_engine_sigint_consume( void* usr ){
         if( rc!=0 ){
             continue;
         }
-        L(prnl("got signal `%d`",sig));
+        L(prnl("received signal `%d`",sig));
         switch( sig ){
             case SIGINT:
-                L(prnl("got SIGINT; requesting engine stop"));
+            case SIGTERM:
+            case SIGQUIT:
+                L(prnl("requesting engine stop due to received signal"));
                 blb_engine_request_stop();
                 break;
-            default: break;
+            default:
+                L(prnl("ignoring signal"));
+                break;
         }
     }
     return(NULL);
@@ -857,21 +862,19 @@ void blb_engine_signals_init( void ){
     sigaddset(&s,SIGUSR2);
     sigaddset(&s,SIGINT);
     sigaddset(&s,SIGPIPE);
+    sigaddset(&s,SIGTERM);
     int rc=pthread_sigmask(SIG_BLOCK,&s,NULL);
     if( rc!=0 ){
         L(prnl("pthread_sigmask() failed `%d`",rc));
     }
 
     pthread_t signal_consumer;
-    pthread_create(&signal_consumer,NULL,blb_engine_sigint_consume,NULL);
+    pthread_create(&signal_consumer,NULL,blb_engine_signal_consume,NULL);
 }
 
 void blb_engine_run( engine_t* e ){
     struct sockaddr_in __addr,*addr=&__addr;
     socklen_t addrlen=sizeof(struct sockaddr_in);
-
-    (void)signal(SIGPIPE,SIG_IGN);
-    //(void)signal(SIGINT,blb_engine_sigint_consume);
 
     pthread_attr_t __attr;
     pthread_attr_init(&__attr);
