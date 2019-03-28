@@ -876,9 +876,6 @@ void blb_engine_run( engine_t* e ){
     struct sockaddr_in __addr,*addr=&__addr;
     socklen_t addrlen=sizeof(struct sockaddr_in);
 
-    (void)signal(SIGPIPE,SIG_IGN);
-    //(void)signal(SIGINT,blb_engine_signal_consume);
-
     pthread_attr_t __attr;
     pthread_attr_init(&__attr);
     pthread_attr_setdetachstate(&__attr,PTHREAD_CREATE_DETACHED);
