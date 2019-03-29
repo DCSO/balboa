@@ -9,7 +9,7 @@ OUT=build/$(OS)/
 
 CFLAGS?=
 CFLAGS+=-pipe -fmax-errors=3 -Wall -Wextra -s -Ofast -flto -fwhole-program -std=gnu11 -D_GNU_SOURCE -D__TRACE__
-CFLAGS+=-I. -I../lib -I../vendor/github.com/ludocode/mpack
+CFLAGS+=-I. -I../lib
 
 LDFLAGS?=
 LDFLAGS+=-pthread -lrocksdb
