@@ -4,6 +4,6 @@
 
 #include <stdlib.h>
 
-int daemonize( void );
+int daemonize(void);
 
 #endif

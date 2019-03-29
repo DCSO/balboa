@@ -47,7 +47,7 @@ struct pdns_entry{
     last_seen: timestamp_in_seconds where field="L"
 }
 struct input_message{
-    observations: array(pdns_entry) where field="O"
+    entry: pdns_entry where field="O"
 }
 ```
 
