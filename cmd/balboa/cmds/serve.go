@@ -140,7 +140,6 @@ func init() {
 	rootCmd.AddCommand(serveCmd)
 
 	serveCmd.Flags().BoolP("verbose", "v", false, "verbose mode")
-	serveCmd.Flags().StringP("dbconfig", "d", "database.yaml", "database configuration file")
 	serveCmd.Flags().StringP("feeders", "f", "feeders.yaml", "feeders configuration file")
 	serveCmd.Flags().IntP("port", "p", 8080, "port for GraphQL server")
 	serveCmd.Flags().StringP("logfile", "l", "/var/log/balboa.log", "log file path")
