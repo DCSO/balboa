@@ -8,11 +8,11 @@ CROSS_PREFIX?=
 OUT=build/$(OS)/
 
 CFLAGS?=
-CFLAGS+=-pipe -fmax-errors=3 -Wall -Wextra -s -Ofast -flto -fwhole-program -std=gnu11 -D_GNU_SOURCE -D__TRACE__
+CFLAGS+=-pipe -static -fmax-errors=3 -Wall -Wextra -s -Ofast -flto -fwhole-program -std=gnu11 -D_GNU_SOURCE -D__TRACE__
 CFLAGS+=-I. -I../lib
 
 LDFLAGS?=
-LDFLAGS+=
+LDFLAGS+=-pthread
 
 ifeq ($(OS),linux)
 CFLAGS+=-D__POSIX__
