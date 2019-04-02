@@ -10,14 +10,16 @@
 typedef struct blb_mock_t blb_mock_t;
 
 static void blb_mock_teardown( db_t* _db );
-static db_t* blb_mock_clone( db_t* db );
+static db_t* blb_mock_thread_init( thread_t* th,db_t* db );
+static void blb_mock_thread_deinit( thread_t* th,db_t* db );
 static int blb_mock_query( thread_t* th,const query_t* q );
 static int blb_mock_input( thread_t* th,const input_t* i );
 static void blb_mock_dump( thread_t* th,const dump_t* d );
 static void blb_mock_backup( thread_t* th,const backup_t* b );
 
 static const dbi_t blb_mock_dbi={
-    .clone=blb_mock_clone
+    .thread_init=blb_mock_thread_init
+   ,.thread_deinit=blb_mock_thread_deinit
    ,.teardown=blb_mock_teardown
    ,.query=blb_mock_query
    ,.input=blb_mock_input
@@ -29,8 +31,14 @@ struct blb_mock_t{
     const dbi_t* dbi;
 };
 
-db_t* blb_mock_clone( db_t* db ){
+db_t* blb_mock_thread_init( thread_t* th,db_t* db ){
+    (void)th;
     return(db);
+}
+
+void blb_mock_thread_deinit( thread_t* th,db_t* db ){
+    (void)th;
+    (void)db;
 }
 
 void blb_mock_teardown( db_t* _db ){

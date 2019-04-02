@@ -9,14 +9,16 @@
 #include <rocksdb-impl.h>
 
 static void blb_rocksdb_teardown( db_t* _db );
-static db_t* blb_rocksdb_clone( db_t* db );
+static db_t* blb_rocksdb_thread_init( thread_t* th,db_t* db );
+static void blb_rocksdb_thread_deinit( thread_t* th,db_t* db );
 static int blb_rocksdb_query( thread_t* th,const query_t* q );
 static int blb_rocksdb_input( thread_t* th,const input_t* i );
 static void blb_rocksdb_backup( thread_t* th,const backup_t* b );
 static void blb_rocksdb_dump( thread_t* th,const dump_t* d );
 
 static const dbi_t blb_rocksdb_dbi={
-    .clone=blb_rocksdb_clone
+    .thread_init=blb_rocksdb_thread_init
+   ,.thread_deinit=blb_rocksdb_thread_deinit
    ,.teardown=blb_rocksdb_teardown
    ,.query=blb_rocksdb_query
    ,.input=blb_rocksdb_input
@@ -239,8 +241,14 @@ static inline rocksdb_mergeoperator_t* blb_rocksdb_mergeoperator_create( ){
     );
 }
 
-db_t* blb_rocksdb_clone( db_t* db ){
+db_t* blb_rocksdb_thread_init( thread_t* th,db_t* db ){
+    (void)th;
     return(db);
+}
+
+void blb_rocksdb_thread_deinit( thread_t* th,db_t* db ){
+    (void)th;
+    (void)db;
 }
 
 void blb_rocksdb_teardown( db_t* _db ){

@@ -86,7 +86,8 @@ struct entry_t{
 };
 
 struct dbi_t{
-    db_t* ( *clone )( db_t* );
+    db_t* ( *thread_init )( thread_t*,db_t* );
+    void ( *thread_deinit )( thread_t*,db_t* );
     void ( *teardown )( db_t* db );
     int ( *query )( thread_t* th,const query_t* query );
     int ( *input )( thread_t* th,const input_t* input );
@@ -108,6 +109,7 @@ struct thread_t{
     pthread_t thread;
     engine_t* engine;
     db_t* db;
+    void* usr_ctx;
     socket_t fd;
     char scrtch[ENGINE_THREAD_SCRTCH_BUFFERS][ENGINE_THREAD_SCRTCH_SZ];
     char scrtch_response_outer[ENGINE_THREAD_SCRTCH_SZ];
@@ -116,8 +118,12 @@ struct thread_t{
     char scrtch_inv[ENGINE_THREAD_SCRTCH_SZ];
 };
 
-static inline db_t* blb_dbi_clone( db_t* db ){
-    return(db->dbi->clone(db));
+static inline db_t* blb_dbi_thread_init( thread_t* th,db_t* db ){
+    return(db->dbi->thread_init(th,db));
+}
+
+static inline void blb_dbi_thread_deinit( thread_t* th,db_t* db ){
+    db->dbi->thread_deinit(th,db);
 }
 
 static inline void blb_dbi_teardown( db_t* db ){

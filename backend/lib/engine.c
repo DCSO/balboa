@@ -741,7 +741,8 @@ static thread_t* blb_engine_thread_new( engine_t* e,int fd ){
     //thread_t* th=malloc(sizeof(thread_t));
     thread_t* th=blb_new(thread_t);
     if( th==NULL ){ return(NULL); }
-    db_t* db=blb_dbi_clone(e->db);
+    th->usr_ctx=NULL;
+    db_t* db=blb_dbi_thread_init(th,e->db);
     if( db==NULL ){ blb_free(th);return(NULL); }
     th->db=db;
     th->engine=e;
@@ -751,6 +752,7 @@ static thread_t* blb_engine_thread_new( engine_t* e,int fd ){
 
 static void blb_engine_thread_teardown( thread_t *th ){
     //db_t* db=blb_dbi_clone(e->db);
+    blb_dbi_thread_deinit(th,th->db);
     close(th->fd);
     blb_free(th);
 }
