@@ -1,5 +1,5 @@
 
-{ pkgs ? import <nixpkgs> {}, unstable ? import <nixos-unstable> {} }: let 
+{ pkgs ? import <nixpkgs> {}, unstable ? import <nixos-unstable> {} }: let
     rocksdb = pkgs.callPackage ./lib/rocksdb.nix {};
 in
   pkgs.mkShell {
