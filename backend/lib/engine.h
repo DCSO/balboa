@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <trace.h>
+#include <protocol.h>
 
 #define ENGINE_THREAD_SCRTCH_SZ (1024*10)
 #define ENGINE_THREAD_SCRTCH_BUFFERS (10)
@@ -26,73 +27,17 @@ typedef struct dbi_t dbi_t;
 typedef struct db_t db_t;
 typedef struct engine_t engine_t;
 typedef struct thread_t thread_t;
-typedef struct query_t query_t;
-typedef struct input_t input_t;
-typedef struct entry_t entry_t;
-typedef struct backup_t backup_t;
-typedef struct dump_t dump_t;
 
 #define QUERY_TYPE_DEFAULT 0
-
-struct query_t{
-    int ty;
-    const char* qrdata;
-    size_t qrdata_len;
-    const char* qrrname;
-    size_t qrrname_len;
-    const char* qrrtype;
-    size_t qrrtype_len;
-    const char* qsensorid;
-    size_t qsensorid_len;
-    int limit;
-};
-
-struct input_t{
-    int count;
-    uint32_t first_seen;
-    uint32_t last_seen;
-    const char* rdata;
-    size_t rdata_len;
-    const char* rrname;
-    size_t rrname_len;
-    const char* rrtype;
-    size_t rrtype_len;
-    const char* sensorid;
-    size_t sensorid_len;
-};
-
-struct backup_t{
-    const char* path;
-    size_t path_len;
-};
-
-struct dump_t{
-    const char* path;
-    size_t path_len;
-};
-
-struct entry_t{
-    int count;
-    uint32_t first_seen;
-    uint32_t last_seen;
-    const char* rdata;
-    size_t rdata_len;
-    const char* rrname;
-    size_t rrname_len;
-    const char* rrtype;
-    size_t rrtype_len;
-    const char* sensorid;
-    size_t sensorid_len;
-};
 
 struct dbi_t{
     db_t* ( *thread_init )( thread_t*,db_t* );
     void ( *thread_deinit )( thread_t*,db_t* );
     void ( *teardown )( db_t* db );
-    int ( *query )( thread_t* th,const query_t* query );
-    int ( *input )( thread_t* th,const input_t* input );
-    void ( *backup )( thread_t* th,const backup_t* backup );
-    void ( *dump )( thread_t* th,const dump_t* dump );
+    int ( *query )( thread_t* th,const protocol_query_request_t* query );
+    int ( *input )( thread_t* th,const protocol_input_request_t* input );
+    void ( *backup )( thread_t* th,const protocol_backup_request_t* backup );
+    void ( *dump )( thread_t* th,const protocol_dump_request_t* dump );
 };
 
 struct db_t{
@@ -130,19 +75,19 @@ static inline void blb_dbi_teardown( db_t* db ){
     db->dbi->teardown(db);
 }
 
-static inline int blb_dbi_query( thread_t* th,const query_t* q ){
+static inline int blb_dbi_query( thread_t* th,const protocol_query_request_t* q ){
     return(th->db->dbi->query(th,q));
 }
 
-static inline int blb_dbi_input( thread_t* th,const input_t* i ){
+static inline int blb_dbi_input( thread_t* th,const protocol_input_request_t* i ){
     return(th->db->dbi->input(th,i));
 }
 
-static inline void blb_dbi_backup( thread_t* th,const backup_t* b) {
+static inline void blb_dbi_backup( thread_t* th,const protocol_backup_request_t* b) {
     th->db->dbi->backup(th,b);
 }
 
-static inline void blb_dbi_dump( thread_t* th,const dump_t* d) {
+static inline void blb_dbi_dump( thread_t* th,const protocol_dump_request_t* d) {
     th->db->dbi->dump(th,d);
 }
 
@@ -152,8 +97,8 @@ void blb_engine_teardown( engine_t* e);
 void blb_engine_run( engine_t* e );
 
 int blb_thread_query_stream_start_response( thread_t* th );
-int blb_thread_query_stream_push_response( thread_t*,const entry_t* entry );
+int blb_thread_query_stream_push_response( thread_t*,const protocol_entry_t* entry );
 int blb_thread_query_stream_end_response( thread_t* th );
-int blb_thread_dump_entry( thread_t* th,const entry_t* entry );
+int blb_thread_dump_entry( thread_t* th,const protocol_entry_t* entry );
 
 #endif

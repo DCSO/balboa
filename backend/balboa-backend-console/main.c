@@ -32,7 +32,7 @@ struct state_t{
     size_t scrtch2_sz;
     FILE* os;
     int sock;
-    int (*dump_entry_cb)( state_t* state,entry_t* entry );
+    int (*dump_entry_cb)( state_t* state,protocol_entry_t* entry );
 };
 
 static int dump_state_init( state_t* state ){
@@ -56,7 +56,7 @@ static void dump_state_teardown( state_t* state ){
     free(state->scrtch2);
 }
 
-static inline int dump_entry_decode( mpack_reader_t* rd, entry_t* entry, const bytestring_sink_t* in ){
+static inline int dump_entry_decode( mpack_reader_t* rd, protocol_entry_t* entry, const bytestring_sink_t* in ){
     bytestring_sink_t sink=*in;
     for( int i=0;i<OBS_FIELDS;i++ ){
         uint32_t field=mpack_expect_uint(rd);
@@ -132,7 +132,7 @@ static ssize_t dump_process( state_t* state,FILE* is ){
             L(prnl("expected map with `%u` entries but got `%u` entries",OBS_FIELDS,cnt));
             break;
         }
-        entry_t __entry={0},*entry=&__entry;
+        protocol_entry_t __entry={0},*entry=&__entry;
         int entry_ok=dump_entry_decode(rd,entry,&sink);
         if( entry_ok!=0 ){
             L(prnl("decoding entry failed"));
@@ -177,7 +177,7 @@ static int dump( state_t* state,const char* dump_file ){
     if( rc<0 ){ return(-1); }else{ return(0); }
 }
 
-static int dump_entry_json_cb( state_t* state,entry_t* entry ){
+static int dump_entry_json_cb( state_t* state,protocol_entry_t* entry ){
     assert( state->os!=NULL );
     bytestring_sink_t __sink=bs_sink(state->scrtch1,state->scrtch1_sz);
     bytestring_sink_t* sink=&__sink;
@@ -212,7 +212,7 @@ static int dump_entry_json_cb( state_t* state,entry_t* entry ){
     return(0);
 }
 
-static int dump_entry_replay_cb( state_t* state,entry_t* entry ){
+static int dump_entry_replay_cb( state_t* state,protocol_entry_t* entry ){
     ASSERT( state->sock!=-1 );
     mpack_writer_t __wr={0},*wr=&__wr;
     //encode inner message

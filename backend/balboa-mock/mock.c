@@ -12,10 +12,10 @@ typedef struct blb_mock_t blb_mock_t;
 static void blb_mock_teardown( db_t* _db );
 static db_t* blb_mock_thread_init( thread_t* th,db_t* db );
 static void blb_mock_thread_deinit( thread_t* th,db_t* db );
-static int blb_mock_query( thread_t* th,const query_t* q );
-static int blb_mock_input( thread_t* th,const input_t* i );
-static void blb_mock_dump( thread_t* th,const dump_t* d );
-static void blb_mock_backup( thread_t* th,const backup_t* b );
+static int blb_mock_query( thread_t* th,const protocol_query_request_t* q );
+static int blb_mock_input( thread_t* th,const protocol_input_request_t* i );
+static void blb_mock_dump( thread_t* th,const protocol_dump_request_t* d );
+static void blb_mock_backup( thread_t* th,const protocol_backup_request_t* b );
 
 static const dbi_t blb_mock_dbi={
     .thread_init=blb_mock_thread_init
@@ -46,7 +46,7 @@ void blb_mock_teardown( db_t* _db ){
     blb_free(_db);
 }
 
-static int blb_mock_query( thread_t* th,const query_t* q ){
+static int blb_mock_query( thread_t* th,const protocol_query_request_t* q ){
     (void)q;
 
     int start_ok=blb_thread_query_stream_start_response(th);
@@ -55,7 +55,7 @@ static int blb_mock_query( thread_t* th,const query_t* q ){
         return(-1);
     }
 
-    entry_t __e,*e=&__e;
+    protocol_entry_t __e,*e=&__e;
     e->sensorid="test-sensor-id";
     e->sensorid_len=strlen(e->sensorid);
     e->rdata="";
@@ -78,24 +78,24 @@ static int blb_mock_query( thread_t* th,const query_t* q ){
     return(0);
 }
 
-static int blb_mock_input( thread_t* th,const input_t* i ){
+static int blb_mock_input( thread_t* th,const protocol_input_request_t* i ){
     ASSERT( th->db->dbi==&blb_mock_dbi );
     //blb_mock_t* db=(blb_mock_t*)th->db;
 
     X(
         prnl("put `%.*s` `%.*s` `%.*s` `%.*s` %d"
-            ,(int)i->rdata_len,i->rdata
-            ,(int)i->rrname_len,i->rrname
-            ,(int)i->rrtype_len,i->rrtype
-            ,(int)i->sensorid_len,i->sensorid
-            ,i->count
+            ,(int)i->entry.rdata_len,i->entry.rdata
+            ,(int)i->entry.rrname_len,i->entry.rrname
+            ,(int)i->entry.rrtype_len,i->entry.rrtype
+            ,(int)i->entry.sensorid_len,i->entry.sensorid
+            ,i->entry.count
         )
     );
 
     return(0);
 }
 
-static void blb_mock_backup( thread_t* th,const backup_t* b ){
+static void blb_mock_backup( thread_t* th,const protocol_backup_request_t* b ){
     ASSERT( th->db->dbi==&blb_mock_dbi );
     //blb_mock_t* db=(blb_mock_t*)th->db;
 
@@ -104,7 +104,7 @@ static void blb_mock_backup( thread_t* th,const backup_t* b ){
     );
 }
 
-static void blb_mock_dump( thread_t* th,const dump_t* d ){
+static void blb_mock_dump( thread_t* th,const protocol_dump_request_t* d ){
     ASSERT( th->db->dbi==&blb_mock_dbi );
     //blb_mock_t* db=(blb_mock_t*)th->db;
 

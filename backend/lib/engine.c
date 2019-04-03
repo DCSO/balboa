@@ -147,7 +147,7 @@ static int blb_engine_thread_consume_backup( thread_t* th,mpack_node_t node ){
         goto decode_error;
     }
 
-    backup_t __b,*b=&__b;
+    protocol_backup_request_t __b,*b=&__b;
     b->path_len=mpack_expect_str_buf(rd,th->scrtch[0],ENGINE_THREAD_SCRTCH_SZ);
     b->path=th->scrtch[0];
 
@@ -203,7 +203,7 @@ static int blb_engine_thread_consume_dump( thread_t* th,mpack_node_t node ){
         goto decode_error;
     }
 
-    dump_t __d,*d=&__d;
+    protocol_dump_request_t __d,*d=&__d;
     d->path_len=mpack_expect_str_buf(rd,th->scrtch[0],ENGINE_THREAD_SCRTCH_SZ);
     d->path=th->scrtch[0];
 
@@ -260,7 +260,7 @@ static int blb_engine_thread_consume_query( thread_t* th,mpack_node_t node ){
     };
 
     struct have_t __h={0},*h=&__h;
-    query_t __q={0},*q=&__q;
+    protocol_query_request_t __q={0},*q=&__q;
     uint32_t w=0;
     for( uint32_t j=0;j<cnt;j++ ){
         char key[64]={'\0'};
@@ -382,7 +382,7 @@ static int blb_engine_thread_consume_input( thread_t* th,mpack_node_t node ){
             goto decode_error;
         }
         ASSERT( cnt<ENGINE_THREAD_SCRTCH_BUFFERS );
-        input_t __i={0},*i=&__i;
+        protocol_input_request_t __i={0},*i=&__i;
         uint32_t w=0;
         for( uint32_t j=0;j<cnt;j++ ){
             char key[1]={'\0'};
@@ -390,46 +390,46 @@ static int blb_engine_thread_consume_input( thread_t* th,mpack_node_t node ){
             switch( key[0] ){
                 case PROTOCOL_PDNS_ENTRY_COUNT_KEY0:{
                     X(prnl("got input request count"));
-                    i->count=mpack_expect_int(rd);
+                    i->entry.count=mpack_expect_int(rd);
                     break;
                 }
                 case PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY0:{
                     X(prnl("got input request first seen"));
                     mpack_timestamp_t ts=mpack_expect_timestamp(rd);
-                    i->first_seen=ts.seconds;
+                    i->entry.first_seen=ts.seconds;
                     break;
                 }
                 case PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY0:{
                     X(prnl("got input request last seen"));
                     mpack_timestamp_t ts=mpack_expect_timestamp(rd);
-                    i->last_seen=ts.seconds;
+                    i->entry.last_seen=ts.seconds;
                     break;
                 }
                 case PROTOCOL_PDNS_ENTRY_RRNAME_KEY0:{
                     X(prnl("got input request rrname"));
-                    i->rrname_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
-                    i->rrname=th->scrtch[w];
+                    i->entry.rrname_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
+                    i->entry.rrname=th->scrtch[w];
                     w++;
                     break;
                 }
                 case PROTOCOL_PDNS_ENTRY_RRTYPE_KEY0:{
                     X(prnl("got input request rrtype"));
-                    i->rrtype_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
-                    i->rrtype=th->scrtch[w];
+                    i->entry.rrtype_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
+                    i->entry.rrtype=th->scrtch[w];
                     w++;
                     break;
                 }
                 case PROTOCOL_PDNS_ENTRY_RDATA_KEY0:{
                     X(prnl("got input request rdata"));
-                    i->rdata_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
-                    i->rdata=th->scrtch[w];
+                    i->entry.rdata_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
+                    i->entry.rdata=th->scrtch[w];
                     w++;
                     break;
                 }
                 case PROTOCOL_PDNS_ENTRY_SENSORID_KEY0:{
                     X(prnl("got input request sensorid"));
-                    i->sensorid_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
-                    i->sensorid=th->scrtch[w];
+                    i->entry.sensorid_len=mpack_expect_str_buf(rd,th->scrtch[w],ENGINE_THREAD_SCRTCH_SZ);
+                    i->entry.sensorid=th->scrtch[w];
                     w++;
                     break;
                 }
@@ -549,7 +549,7 @@ encode_error:
     return(-1);
 }
 
-int blb_thread_dump_entry( thread_t* th,const entry_t* entry ){
+int blb_thread_dump_entry( thread_t* th,const protocol_entry_t* entry ){
     X(
         prnl("dump stream push entry");
         prnl("<%d `%.*s` `%.*s` `%.*s` `%.*s`>",
@@ -613,7 +613,7 @@ int blb_thread_dump_entry( thread_t* th,const entry_t* entry ){
     return(0);
 }
 
-int blb_thread_query_stream_push_response( thread_t* th,const entry_t* entry ){
+int blb_thread_query_stream_push_response( thread_t* th,const protocol_entry_t* entry ){
     T(
         prnl("query stream push entry");
         prnl("<%d `%.*s` `%.*s` `%.*s` `%.*s`>",

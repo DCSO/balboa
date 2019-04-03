@@ -11,10 +11,10 @@
 static void blb_rocksdb_teardown( db_t* _db );
 static db_t* blb_rocksdb_thread_init( thread_t* th,db_t* db );
 static void blb_rocksdb_thread_deinit( thread_t* th,db_t* db );
-static int blb_rocksdb_query( thread_t* th,const query_t* q );
-static int blb_rocksdb_input( thread_t* th,const input_t* i );
-static void blb_rocksdb_backup( thread_t* th,const backup_t* b );
-static void blb_rocksdb_dump( thread_t* th,const dump_t* d );
+static int blb_rocksdb_query( thread_t* th,const protocol_query_request_t* q );
+static int blb_rocksdb_input( thread_t* th,const protocol_input_request_t* i );
+static void blb_rocksdb_backup( thread_t* th,const protocol_backup_request_t* b );
+static void blb_rocksdb_dump( thread_t* th,const protocol_dump_request_t* d );
 
 static const dbi_t blb_rocksdb_dbi={
     .thread_init=blb_rocksdb_thread_init
@@ -264,7 +264,7 @@ void blb_rocksdb_teardown( db_t* _db ){
     blb_free(db);
 }
 
-static int blb_rocksdb_query_by_o( thread_t* th,const query_t* q ){
+static int blb_rocksdb_query_by_o( thread_t* th,const protocol_query_request_t* q ){
     ASSERT( th->db->dbi==&blb_rocksdb_dbi );
     blb_rocksdb_t* db=(blb_rocksdb_t*)th->db;
     size_t prefix_len=0;
@@ -390,7 +390,7 @@ static int blb_rocksdb_query_by_o( thread_t* th,const query_t* q ){
         }
 
         keys_hit+=1;
-        entry_t __e,*e=&__e;
+        protocol_entry_t __e,*e=&__e;
         e->sensorid=toks[SENSORID].tok;
         e->sensorid_len=toks[SENSORID].tok_len;
         e->rdata=toks[RDATA].tok;
@@ -417,7 +417,7 @@ stream_error:
     return(-1);
 }
 
-static int blb_rocksdb_query_by_i( thread_t* th,const query_t* q ){
+static int blb_rocksdb_query_by_i( thread_t* th,const protocol_query_request_t* q ){
     ASSERT( th->db->dbi==&blb_rocksdb_dbi );
     blb_rocksdb_t* db=(blb_rocksdb_t*)th->db;
     size_t prefix_len=0;
@@ -548,7 +548,7 @@ static int blb_rocksdb_query_by_i( thread_t* th,const query_t* q ){
         free(val);
 
         keys_hit+=1;
-        entry_t __e,*e=&__e;
+        protocol_entry_t __e,*e=&__e;
         e->sensorid=toks[SENSORID].tok;
         e->sensorid_len=toks[SENSORID].tok_len;
         e->rdata=toks[RDATA].tok;
@@ -575,7 +575,7 @@ stream_error:
     return(-1);
 }
 
-static int blb_rocksdb_query( thread_t* th,const query_t* q ){
+static int blb_rocksdb_query( thread_t* th,const protocol_query_request_t* q ){
     int rc=-1;
     if( q->qrrname_len>0 ){
         rc=blb_rocksdb_query_by_o(th,q);
@@ -585,7 +585,7 @@ static int blb_rocksdb_query( thread_t* th,const query_t* q ){
     return(rc);
 }
 
-static void blb_rocksdb_backup( thread_t* th,const backup_t* b ){
+static void blb_rocksdb_backup( thread_t* th,const protocol_backup_request_t* b ){
     ASSERT( th->db->dbi==&blb_rocksdb_dbi );
     blb_rocksdb_t* db=(blb_rocksdb_t*)th->db;
 
@@ -618,7 +618,7 @@ static void blb_rocksdb_backup( thread_t* th,const backup_t* b ){
     }
 }
 
-static void blb_rocksdb_dump( thread_t* th,const dump_t* d ){
+static void blb_rocksdb_dump( thread_t* th,const protocol_dump_request_t* d ){
     ASSERT( th->db->dbi==&blb_rocksdb_dbi );
     blb_rocksdb_t* db=(blb_rocksdb_t*)th->db;
 
@@ -692,7 +692,7 @@ static void blb_rocksdb_dump( thread_t* th,const dump_t* d ){
         }
 
         cnt+=1;
-        entry_t __e,*e=&__e;
+        protocol_entry_t __e,*e=&__e;
         e->sensorid=toks[SENSORID].tok;
         e->sensorid_len=toks[SENSORID].tok_len;
         e->rdata=toks[RDATA].tok;
@@ -721,39 +721,43 @@ static void blb_rocksdb_dump( thread_t* th,const dump_t* d ){
     L(prnl("dumped `%"PRIu64"` entries",cnt));
 }
 
-static int blb_rocksdb_input( thread_t* th,const input_t* i ){
+static int blb_rocksdb_input( thread_t* th,const protocol_input_request_t* i ){
     ASSERT( th->db->dbi==&blb_rocksdb_dbi );
     blb_rocksdb_t* db=(blb_rocksdb_t*)th->db;
 
     X(
         prnl("put `%.*s` `%.*s` `%.*s` `%.*s` %d"
-            ,(int)i->rdata_len,i->rdata
-            ,(int)i->rrname_len,i->rrname
-            ,(int)i->rrtype_len,i->rrtype
-            ,(int)i->sensorid_len,i->sensorid
-            ,i->count
+            ,(int)i->entry.rdata_len,i->entry.rdata
+            ,(int)i->entry.rrname_len,i->entry.rrname
+            ,(int)i->entry.rrtype_len,i->entry.rrtype
+            ,(int)i->entry.sensorid_len,i->entry.sensorid
+            ,i->entry.count
         )
     );
 
-    value_t v={.count=i->count,.first_seen=i->first_seen,.last_seen=i->last_seen};
+    value_t v={
+        .count=i->entry.count
+       ,.first_seen=i->entry.first_seen
+       ,.last_seen=i->entry.last_seen
+    };
     char val[sizeof(uint32_t)*3];
     size_t val_len=sizeof(val);
     (void)blb_rocksdb_val_encode(&v,val,val_len);
 
     (void)snprintf(th->scrtch_key,ENGINE_THREAD_SCRTCH_SZ,
         "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s"
-       ,(int)i->rrname_len,i->rrname
-       ,(int)i->sensorid_len,i->sensorid
-       ,(int)i->rrtype_len,i->rrtype
-       ,(int)i->rdata_len,i->rdata
+       ,(int)i->entry.rrname_len,i->entry.rrname
+       ,(int)i->entry.sensorid_len,i->entry.sensorid
+       ,(int)i->entry.rrtype_len,i->entry.rrtype
+       ,(int)i->entry.rdata_len,i->entry.rdata
     );
 
     (void)snprintf(th->scrtch_inv,ENGINE_THREAD_SCRTCH_SZ,
         "i\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s"
-       ,(int)i->rdata_len,i->rdata
-       ,(int)i->sensorid_len,i->sensorid
-       ,(int)i->rrname_len,i->rrname
-       ,(int)i->rrtype_len,i->rrtype
+       ,(int)i->entry.rdata_len,i->entry.rdata
+       ,(int)i->entry.sensorid_len,i->entry.sensorid
+       ,(int)i->entry.rrname_len,i->entry.rrname
+       ,(int)i->entry.rrtype_len,i->entry.rrtype
     );
 
     char *err=NULL;
