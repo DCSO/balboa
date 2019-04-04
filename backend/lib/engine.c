@@ -48,6 +48,23 @@ static int blb_thread_cnt_get() {
   return ( atomic_load( &blb_thread_cnt ) );
 }
 
+static int blb_thread_write_all( thread_t* th, char* _p, size_t _p_sz ) {
+  char* p = _p;
+  ssize_t r = _p_sz;
+  while( r > 0 ) {
+    ssize_t rc = write( th->fd, p, r );
+    if( rc < 0 ) {
+      L( prnl( "write() failed error `%s`", strerror( errno ) ) );
+      return ( -1 );
+    } else if( rc == 0 && errno == EINTR ) {
+      continue;
+    }
+    r -= rc;
+    p += rc;
+  }
+  return ( 0 );
+}
+
 static inline int blb_engine_poll_write( int fd, int seconds ) {
   if( blb_engine_poll_stop() > 0 ) {
     V( prnl( "engine stop detected" ) );
@@ -495,7 +512,6 @@ decode_error:
 }
 
 static int blb_engine_thread_consume( thread_t* th, mpack_tree_t* tree ) {
-  ( void )th;
   mpack_node_t root = mpack_tree_root( tree );
   WHEN_X {
     theTrace_lock();
@@ -536,56 +552,19 @@ static int blb_engine_thread_consume( thread_t* th, mpack_tree_t* tree ) {
 }
 
 int blb_thread_query_stream_start_response( thread_t* th ) {
-  T( prnl( "query stream start response" ) );
-
   if( blb_engine_poll_stop() > 0 ) {
     L( prnl( "thread <%04lx> engine stop detected", th->thread ) );
     return ( -1 );
   }
 
-  mpack_writer_t __wr = {0}, *wr = &__wr;
-  // encode outer message
-  mpack_writer_init(
-      wr, ( char* )th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
-  mpack_start_map( wr, 2 );
-  mpack_write_cstr( wr, PROTOCOL_TYPED_MESSAGE_TYPE_KEY );
-  mpack_write_int( wr, PROTOCOL_QUERY_STREAM_START_RESPONSE );
-  mpack_write_cstr( wr, PROTOCOL_TYPED_MESSAGE_ENCODED_KEY );
-  mpack_write_bin( wr, "", 0 );
-  mpack_finish_map( wr );
-  if( mpack_writer_error( wr ) != mpack_ok ) {
-    V( prnl( "unable to encode outer stream start response" ) );
-    goto encode_error;
-  }
-  size_t used_outer = mpack_writer_buffer_used( wr );
-  ASSERT( used_outer < ENGINE_MAX_MESSAGE_SZ );
-  mpack_writer_destroy( wr );
-  X( prnl( "encoded outer message size %zu", used_outer ) );
-
-  int rc = blb_engine_poll_write( th->fd, ENGINE_POLL_WRITE_TIMEOUT );
-  if( rc != 0 ) {
-    X( prnl( "egnine poll write failed" ) );
-    goto encode_error;
+  ssize_t used = blb_protocol_encode_stream_start_response(
+      th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
+  if( used <= 0 ) {
+    L( prnl( "blb_protocol_encode_stream_start_response() failed" ) );
+    return ( -1 );
   }
 
-  uint8_t* p = ( uint8_t* )th->scrtch_response_outer;
-  ssize_t r = used_outer;
-  while( r > 0 ) {
-    ssize_t rc = write( th->fd, p, r );
-    if( rc < 0 ) {
-      V( prnl( "write() failed error `%s`\n", strerror( errno ) ) );
-      goto encode_error;
-    } else if( rc == 0 && errno == EINTR ) {
-      continue;
-    }
-    r -= rc;
-    p += rc;
-  }
-  return ( 0 );
-
-encode_error:
-  mpack_writer_destroy( wr );
-  return ( -1 );
+  return ( blb_thread_write_all( th, th->scrtch_response_outer, used ) );
 }
 
 int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
@@ -611,54 +590,14 @@ int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
     return ( -1 );
   }
 
-  mpack_writer_t __wr = {0}, *wr = &__wr;
-  mpack_writer_init(
-      wr, ( char* )th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
-
-  mpack_start_map( wr, OBS_FIELDS );
-  mpack_write_uint( wr, OBS_RRNAME_IDX );
-  mpack_write_bin( wr, entry->rrname, entry->rrname_len );
-  mpack_write_uint( wr, OBS_RRTYPE_IDX );
-  mpack_write_bin( wr, entry->rrtype, entry->rrtype_len );
-  mpack_write_uint( wr, OBS_RDATA_IDX );
-  mpack_write_bin( wr, entry->rdata, entry->rdata_len );
-  mpack_write_uint( wr, OBS_SENSOR_IDX );
-  mpack_write_bin( wr, entry->sensorid, entry->sensorid_len );
-  mpack_write_uint( wr, OBS_COUNT_IDX );
-  mpack_write_uint( wr, entry->count );
-  mpack_write_uint( wr, OBS_FIRST_SEEN_IDX );
-  mpack_write_uint( wr, entry->first_seen );
-  mpack_write_uint( wr, OBS_LAST_SEEN_IDX );
-  mpack_write_uint( wr, entry->last_seen );
-  mpack_finish_map( wr );
-
-  mpack_error_t err = mpack_writer_error( wr );
-  if( err != mpack_ok ) {
-    fprintf( stderr, "encoding msgpack data failed err=%d\n", err );
-    mpack_writer_destroy( wr );
+  ssize_t used = blb_protocol_encode_dump_entry(
+      entry, th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
+  if( used <= 0 ) {
+    L( prnl( "blb_protocol_encode_dump_entry() failed" ) );
     return ( -1 );
   }
 
-  size_t used = mpack_writer_buffer_used( wr );
-  X( prnl( "encoded observation entry size `%zu`", used ) );
-  ASSERT( used < ENGINE_MAX_MESSAGE_SZ );
-
-  mpack_writer_destroy( wr );
-
-  uint8_t* p = ( uint8_t* )th->scrtch_response_outer;
-  ssize_t r = used;
-  while( r > 0 ) {
-    ssize_t rc = write( th->fd, p, r );
-    if( rc < 0 ) {
-      L( prnl( "write() failed `%s`", strerror( errno ) ) );
-      return ( -1 );
-    } else if( rc == 0 && errno == EINTR ) {
-      continue;
-    }
-    r -= rc;
-    p += rc;
-  }
-  return ( 0 );
+  return ( blb_thread_write_all( th, th->scrtch_response_outer, used ) );
 }
 
 int blb_thread_query_stream_push_response(
@@ -685,118 +624,32 @@ int blb_thread_query_stream_push_response(
     return ( -1 );
   }
 
-  mpack_writer_t __wr = {0}, *wr = &__wr;
-  // encode inner message
-  mpack_writer_init(
-      wr, ( char* )th->scrtch_response_inner, ENGINE_MAX_MESSAGE_SZ );
-  mpack_start_map( wr, 7 );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_COUNT_KEY );
-  mpack_write_uint( wr, entry->count );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY );
-  // mpack_write_timestamp_seconds(wr,entry->first_seen);
-  mpack_write_uint( wr, entry->first_seen );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY );
-  // mpack_write_timestamp_seconds(wr,entry->last_seen);
-  mpack_write_uint( wr, entry->last_seen );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RDATA_KEY );
-  mpack_write_str( wr, entry->rdata, entry->rdata_len );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RRNAME_KEY );
-  mpack_write_str( wr, entry->rrname, entry->rrname_len );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RRTYPE_KEY );
-  mpack_write_str( wr, entry->rrtype, entry->rrtype_len );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_SENSORID_KEY );
-  mpack_write_str( wr, entry->sensorid, entry->sensorid_len );
-  mpack_finish_map( wr );
-  if( mpack_writer_error( wr ) != mpack_ok ) {
-    V( prnl( "unable to encode inner stream data response" ) );
-    goto encode_error;
+  ssize_t used = blb_protocol_encode_stream_entry(
+      entry, th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
+  if( used <= 0 ) {
+    L( prnl( "blb_protocol_encode_stream_entry() failed" ) );
+    return ( -1 );
   }
-  size_t used_inner = mpack_writer_buffer_used( wr );
-  ASSERT( used_inner < ENGINE_MAX_MESSAGE_SZ );
-  mpack_writer_destroy( wr );
-  // encode outer message
-  mpack_writer_init(
-      wr, ( char* )th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
-  mpack_start_map( wr, 2 );
-  mpack_write_cstr( wr, PROTOCOL_TYPED_MESSAGE_TYPE_KEY );
-  mpack_write_int( wr, PROTOCOL_QUERY_STREAM_DATA_RESPONSE );
-  mpack_write_cstr( wr, PROTOCOL_TYPED_MESSAGE_ENCODED_KEY );
-  mpack_write_bin( wr, th->scrtch_response_inner, used_inner );
-  mpack_finish_map( wr );
-  if( mpack_writer_error( wr ) != mpack_ok ) {
-    V( prnl( "unable to encode outer stream data response" ) );
-    goto encode_error;
-  }
-  size_t used_outer = mpack_writer_buffer_used( wr );
-  ASSERT( used_outer < ENGINE_MAX_MESSAGE_SZ );
-  mpack_writer_destroy( wr );
-  X( prnl( "encoded inner message size %zu", used_inner ) );
-  X( prnl( "encoded outer message size %zu", used_outer ) );
-  uint8_t* p = ( uint8_t* )th->scrtch_response_outer;
-  ssize_t r = used_outer;
-  while( r > 0 ) {
-    ssize_t rc = write( th->fd, p, r );
-    if( rc < 0 ) {
-      V( prnl( "write() failed error `%s`", strerror( errno ) ) );
-      goto encode_error;
-    } else if( rc == 0 && errno == EINTR ) {
-      continue;
-    }
-    r -= rc;
-    p += rc;
-  }
-  return ( 0 );
 
-encode_error:
-  mpack_writer_destroy( wr );
-  return ( -1 );
+  return ( blb_thread_write_all( th, th->scrtch_response_outer, used ) );
 }
 
 int blb_thread_query_stream_end_response( thread_t* th ) {
-  T( prnl( "query stream end response" ) );
-
   if( blb_engine_poll_stop() > 0 ) {
     L( prnl( "thread <%04lx> engine stop detected", th->thread ) );
     return ( -1 );
   }
 
-  mpack_writer_t __wr = {0}, *wr = &__wr;
-  // encode outer message
-  mpack_writer_init(
-      wr, ( char* )th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
-  mpack_start_map( wr, 2 );
-  mpack_write_cstr( wr, PROTOCOL_TYPED_MESSAGE_TYPE_KEY );
-  mpack_write_int( wr, PROTOCOL_QUERY_STREAM_END_RESPONSE );
-  mpack_write_cstr( wr, PROTOCOL_TYPED_MESSAGE_ENCODED_KEY );
-  mpack_write_bin( wr, "", 0 );
-  mpack_finish_map( wr );
-  if( mpack_writer_error( wr ) != mpack_ok ) {
-    V( prnl( "unable to encode outer stream end response" ) );
-    goto encode_error;
-  }
-  size_t used_outer = mpack_writer_buffer_used( wr );
-  ASSERT( used_outer < ENGINE_MAX_MESSAGE_SZ );
-  mpack_writer_destroy( wr );
-  X( prnl( "encoded outer message size %zu", used_outer ) );
-  uint8_t* p = ( uint8_t* )th->scrtch_response_outer;
-  ssize_t r = used_outer;
-  while( r > 0 ) {
-    ssize_t rc = write( th->fd, p, r );
-    if( rc < 0 ) {
-      V( prnl( "write() failed error `%s`", strerror( errno ) ) );
-      goto encode_error;
-    } else if( rc == 0 && errno == EINTR ) {
-      continue;
-    }
-    r -= rc;
-    p += rc;
+  ssize_t used = blb_protocol_encode_stream_end_response(
+      th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
+  if( used <= 0 ) {
+    L( prnl( "blb_protocol_encode_stream_end_response() failed" ) );
+    return ( -1 );
   }
 
-  return ( 0 );
+  X( prnl( "blb_protocol_encode_stream_end_response() returned `%zd`", used ) );
 
-encode_error:
-  mpack_writer_destroy( wr );
-  return ( -1 );
+  return ( blb_thread_write_all( th, th->scrtch_response_outer, used ) );
 }
 
 static thread_t* blb_engine_thread_new( engine_t* e, int fd ) {
@@ -815,7 +668,6 @@ static thread_t* blb_engine_thread_new( engine_t* e, int fd ) {
 }
 
 static void blb_engine_thread_teardown( thread_t* th ) {
-  // db_t* db=blb_dbi_clone(e->db);
   blb_dbi_thread_deinit( th, th->db );
   close( th->fd );
   blb_free( th );

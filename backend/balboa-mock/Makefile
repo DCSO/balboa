@@ -29,7 +29,7 @@ CC=$(CROSS_PREFIX)$(CCOMPILER)
 hdr-balboa-mock=engine.h trace.h daemon.h
 hdr-balboa-mock-y=$(addprefix ../lib/,$(hdr-balboa-mock)) mock.h mpack-config.h
 
-src-balboa-mock=trace.c daemon.c mpack.c engine.c
+src-balboa-mock=trace.c daemon.c protocol.c mpack.c engine.c
 src-balboa-mock-y=$(addprefix ../lib/,$(src-balboa-mock))
 src-balboa-mock-y+=mock.c main.c
 

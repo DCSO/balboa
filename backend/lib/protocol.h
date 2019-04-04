@@ -2,6 +2,8 @@
 #ifndef __PROTOCOL_H
 #define __PROTOCOL_H
 
+#include <alloc.h>
+#include <inttypes.h>
 #include <stdlib.h>
 
 enum {
@@ -119,5 +121,22 @@ struct protocol_query_request_t {
 
 ssize_t blb_protocol_encode_query_request(
     const protocol_query_request_t* q, char* p, size_t p_sz );
+
+ssize_t blb_protocol_encode_stream_start_response( char* p, size_t p_sz );
+ssize_t blb_protocol_encode_stream_end_response( char* p, size_t p_sz );
+ssize_t blb_protocol_encode_stream_entry(
+    const protocol_entry_t* entry, char* p, size_t p_sz );
+ssize_t blb_protocol_encode_dump_entry(
+    const protocol_entry_t* entry, char* p, size_t p_sz );
+
+// static size_t blb_thread_read_stream_cb(
+//    mpack_tree_t* tree, char* p, size_t p_sz ) {
+
+typedef struct protocol_stream_t protocol_stream_t;
+protocol_stream_t* blb_protocol_stream_new(
+    void* usr,
+    ssize_t ( *read_cb )( void* usr, char* p, size_t p_sz ),
+    size_t max_sz,
+    size_t max_nodes );
 
 #endif

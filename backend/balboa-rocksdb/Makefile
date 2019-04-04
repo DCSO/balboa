@@ -27,10 +27,10 @@ MAKEFLAGS+=--no-print-directory
 
 CC=$(CROSS_PREFIX)$(CCOMPILER)
 
-hdr-balboa-rocksdb=protocol.h engine.h trace.h daemon.h mpack.h
-hdr-balboa-rocksdb-y=$(addprefix ../lib/,$(hdr-balboa-rocksdb)) mpack-config.h rocksdb-impl.h
+hdr-balboa-rocksdb=protocol.h engine.h trace.h daemon.h mpack.h mpack-config.h
+hdr-balboa-rocksdb-y=$(addprefix ../lib/,$(hdr-balboa-rocksdb)) rocksdb-impl.h
 
-src-balboa-rocksdb=trace.c daemon.c engine.c mpack.c
+src-balboa-rocksdb=trace.c daemon.c protocol.c engine.c mpack.c
 src-balboa-rocksdb-y=$(addprefix ../lib/,$(src-balboa-rocksdb))
 src-balboa-rocksdb-y+=rocksdb-impl.c main.c
 

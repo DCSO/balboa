@@ -26,8 +26,8 @@ MAKEFLAGS+=--no-print-directory
 
 CC=$(CROSS_PREFIX)$(CCOMPILER)
 
-hdr-lib=bs.h trace.h protocol.h engine.h
-hdr-lib-y=$(addprefix ../lib/,$(hdr-lib)) mpack-config.h
+hdr-lib=bs.h trace.h protocol.h engine.h mpack-config.h
+hdr-lib-y=$(addprefix ../lib/,$(hdr-lib))
 
 src-console-read-y=../lib/mpack.c ../lib/trace.c ../lib/protocol.c main.c
 
