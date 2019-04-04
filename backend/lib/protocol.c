@@ -37,7 +37,7 @@ ssize_t blb_protocol_encode_dump_request( const protocol_dump_request_t* r,char*
     mpack_writer_init(wr,p,p_sz);
     mpack_start_map(wr,1);
         mpack_write_cstr(wr,PROTOCOL_DUMP_REQUEST_PATH_KEY);
-        mpack_write_cstr(wr,r->path);
+        mpack_write_str(wr,r->path,r->path_len);
     mpack_finish_map(wr);
     mpack_error_t err=mpack_writer_error(wr);
     if( err!=mpack_ok ){
@@ -52,4 +52,28 @@ ssize_t blb_protocol_encode_dump_request( const protocol_dump_request_t* r,char*
     mpack_writer_destroy(wr);
 
     return(blb_protocol_encode_outer_request(PROTOCOL_DUMP_REQUEST,p,p_sz,used_inner));
+}
+
+ssize_t blb_protocol_encode_backup_request( const protocol_dump_request_t* r,char* p,size_t p_sz ){
+    mpack_writer_t __wr={0},*wr=&__wr;
+
+    //encode inner message
+    mpack_writer_init(wr,p,p_sz);
+    mpack_start_map(wr,1);
+        mpack_write_cstr(wr,PROTOCOL_BACKUP_REQUEST_PATH_KEY);
+        mpack_write_str(wr,r->path,r->path_len);
+    mpack_finish_map(wr);
+    mpack_error_t err=mpack_writer_error(wr);
+    if( err!=mpack_ok ){
+        L(prnl("encoding inner msgpack data failed `%d`",err));
+        mpack_writer_destroy(wr);
+        return(-1);
+    }
+
+    size_t used_inner=mpack_writer_buffer_used(wr);
+    X(prnl("encoded inner message size `%zu`",used_inner));
+    ASSERT( used_inner<p_sz );
+    mpack_writer_destroy(wr);
+
+    return(blb_protocol_encode_outer_request(PROTOCOL_BACKUP_REQUEST,p,p_sz,used_inner));
 }
