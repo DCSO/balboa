@@ -27,18 +27,14 @@ MAKEFLAGS+=--no-print-directory
 
 CC=$(CROSS_PREFIX)$(CCOMPILER)
 
+hdr-balboa-rocksdb=protocol.h engine.h trace.h daemon.h mpack.h
+hdr-balboa-rocksdb-y=$(addprefix ../lib/,$(hdr-balboa-rocksdb)) mpack-config.h rocksdb-impl.h
+
 src-balboa-rocksdb=trace.c daemon.c engine.c mpack.c
 src-balboa-rocksdb-y=$(addprefix ../lib/,$(src-balboa-rocksdb))
-
-hdr-balboa-rocksdb=protocol.h engine.h trace.h daemon.h mpack.h
-hdr-balboa-rocksdb-y=$(addprefix ../lib/,$(hdr-balboa-rocksdb)) rocksdb-impl.h
-
 src-balboa-rocksdb-y+=rocksdb-impl.c main.c
-ifdef D
-target-balboa-rocksdb-y=$(OUT)$(CROSS_PREFIX)balboa-rocksdb-debug
-else
+
 target-balboa-rocksdb-y=$(OUT)$(CROSS_PREFIX)balboa-rocksdb
-endif
 
 dirs-y=.
 
@@ -49,7 +45,7 @@ $(OUT)build:
 	$(Q)mkdir -p $(addprefix $(OUT),$(dirs-y))
 	$(Q)touch $@
 
-$(target-balboa-rocksdb-y): $(OUT)build $(src-balboa-rocksdb-y) $(hdr-balboa-rocksdb-y) mpack-config.h Makefile
+$(target-balboa-rocksdb-y): $(OUT)build $(src-balboa-rocksdb-y) $(hdr-balboa-rocksdb-y) Makefile
 	$(CC) $(CFLAGS) $(src-balboa-rocksdb-y) -o $(target-balboa-rocksdb-y) $(LDFLAGS)
 
 clean:
