@@ -54,7 +54,7 @@ ssize_t blb_protocol_encode_dump_request( const protocol_dump_request_t* r,char*
     return(blb_protocol_encode_outer_request(PROTOCOL_DUMP_REQUEST,p,p_sz,used_inner));
 }
 
-ssize_t blb_protocol_encode_backup_request( const protocol_dump_request_t* r,char* p,size_t p_sz ){
+ssize_t blb_protocol_encode_backup_request( const protocol_backup_request_t* r,char* p,size_t p_sz ){
     mpack_writer_t __wr={0},*wr=&__wr;
 
     //encode inner message
