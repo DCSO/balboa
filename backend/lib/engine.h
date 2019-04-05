@@ -47,8 +47,6 @@ struct thread_t {
   void* usr_ctx;
   socket_t fd;
   char scrtch_response[ENGINE_THREAD_SCRTCH_SZ];
-  char scrtch_key[ENGINE_THREAD_SCRTCH_SZ];
-  char scrtch_inv[ENGINE_THREAD_SCRTCH_SZ];
 };
 
 static inline db_t* blb_dbi_thread_init( thread_t* th, db_t* db ) {

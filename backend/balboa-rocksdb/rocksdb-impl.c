@@ -8,6 +8,8 @@
 #include <rocksdb-impl.h>
 #include <rocksdb/c.h>
 
+#define ROCKSDB_THREAD_SCRTCH_SZ ( 1024 * 10 )
+
 static void blb_rocksdb_teardown( db_t* _db );
 static db_t* blb_rocksdb_thread_init( thread_t* th, db_t* db );
 static void blb_rocksdb_thread_deinit( thread_t* th, db_t* db );
@@ -33,6 +35,8 @@ struct blb_rocksdb_t {
   rocksdb_writeoptions_t* writeoptions;
   rocksdb_readoptions_t* readoptions;
   rocksdb_mergeoperator_t* mergeop;
+  char scrtch_key[ROCKSDB_THREAD_SCRTCH_SZ];
+  char scrtch_inv[ROCKSDB_THREAD_SCRTCH_SZ];
 };
 
 rocksdb_t* blb_rocksdb_handle( db_t* db );
@@ -267,8 +271,8 @@ static int blb_rocksdb_query_by_o(
   if( q->qsensorid_len > 0 ) {
     prefix_len = q->qsensorid_len + q->qrrname_len + 4;
     ( void )snprintf(
-        th->scrtch_key,
-        ENGINE_THREAD_SCRTCH_SZ,
+        db->scrtch_key,
+        ROCKSDB_THREAD_SCRTCH_SZ,
         "o\x1f%.*s\x1f%.*s\x1f",
         ( int )q->qrrname_len,
         q->qrrname,
@@ -277,14 +281,14 @@ static int blb_rocksdb_query_by_o(
   } else {
     prefix_len = q->qrrname_len + 3;
     ( void )snprintf(
-        th->scrtch_key,
-        ENGINE_THREAD_SCRTCH_SZ,
+        db->scrtch_key,
+        ROCKSDB_THREAD_SCRTCH_SZ,
         "o\x1f%.*s\x1f",
         ( int )q->qrrname_len,
         q->qrrname );
   }
 
-  X( prnl( "prefix key `%.*s`", ( int )prefix_len, th->scrtch_key ) );
+  X( prnl( "prefix key `%.*s`", ( int )prefix_len, db->scrtch_key ) );
 
   int start_ok = blb_thread_query_stream_start_response( th );
   if( start_ok != 0 ) {
@@ -293,7 +297,7 @@ static int blb_rocksdb_query_by_o(
   }
 
   rocksdb_iterator_t* it = rocksdb_create_iterator( db->db, db->readoptions );
-  rocksdb_iter_seek( it, th->scrtch_key, prefix_len );
+  rocksdb_iter_seek( it, db->scrtch_key, prefix_len );
   size_t keys_visited = 0;
   size_t keys_hit = 0;
   for( ; rocksdb_iter_valid( it ) != ( unsigned char )0
@@ -427,8 +431,8 @@ static int blb_rocksdb_query_by_i(
   if( q->qsensorid_len > 0 ) {
     prefix_len = q->qrdata_len + q->qsensorid_len + 4;
     ( void )snprintf(
-        th->scrtch_inv,
-        ENGINE_THREAD_SCRTCH_SZ,
+        db->scrtch_inv,
+        ROCKSDB_THREAD_SCRTCH_SZ,
         "i\x1f%.*s\x1f%.*s\x1f",
         ( int )q->qrdata_len,
         q->qrdata,
@@ -437,15 +441,15 @@ static int blb_rocksdb_query_by_i(
   } else {
     prefix_len = q->qrdata_len + 3;
     ( void )snprintf(
-        th->scrtch_inv,
-        ENGINE_THREAD_SCRTCH_SZ,
+        db->scrtch_inv,
+        ROCKSDB_THREAD_SCRTCH_SZ,
         "i\x1f%.*s\x1f",
         ( int )q->qrdata_len,
         q->qrdata );
   }
-  ASSERT( th->scrtch_inv[prefix_len] == '\0' );
+  ASSERT( db->scrtch_inv[prefix_len] == '\0' );
 
-  X( prnl( "prefix key `%.*s`", ( int )prefix_len, th->scrtch_inv ) );
+  X( prnl( "prefix key `%.*s`", ( int )prefix_len, db->scrtch_inv ) );
 
   int start_ok = blb_thread_query_stream_start_response( th );
   if( start_ok != 0 ) {
@@ -454,7 +458,7 @@ static int blb_rocksdb_query_by_i(
   }
 
   rocksdb_iterator_t* it = rocksdb_create_iterator( db->db, db->readoptions );
-  rocksdb_iter_seek( it, th->scrtch_inv, prefix_len );
+  rocksdb_iter_seek( it, db->scrtch_inv, prefix_len );
   size_t keys_visited = 0;
   int keys_hit = 0;
   for( ; rocksdb_iter_valid( it ) != ( unsigned char )0 && keys_hit < q->limit;
@@ -529,10 +533,10 @@ static int blb_rocksdb_query_by_i(
       continue;
     }
 
-    memset( th->scrtch_key, '\0', ENGINE_THREAD_SCRTCH_SZ );
+    memset( db->scrtch_key, '\0', ROCKSDB_THREAD_SCRTCH_SZ );
     ( void )snprintf(
-        th->scrtch_key,
-        ENGINE_THREAD_SCRTCH_SZ,
+        db->scrtch_key,
+        ROCKSDB_THREAD_SCRTCH_SZ,
         "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
         toks[RRNAME].tok_len,
         toks[RRNAME].tok,
@@ -543,12 +547,12 @@ static int blb_rocksdb_query_by_i(
         toks[RDATA].tok_len,
         toks[RDATA].tok );
 
-    X( prnl( "full key `%s`", th->scrtch_key ) );
+    X( prnl( "full key `%s`", db->scrtch_key ) );
 
-    size_t fullkey_len = strlen( th->scrtch_key );
+    size_t fullkey_len = strlen( db->scrtch_key );
     size_t val_size = 0;
     char* val = rocksdb_get(
-        db->db, db->readoptions, th->scrtch_key, fullkey_len, &val_size, &err );
+        db->db, db->readoptions, db->scrtch_key, fullkey_len, &val_size, &err );
     if( val == NULL || err != NULL ) {
       X( prnl( "rocksdb_get() observation not found" ) );
       continue;
@@ -754,8 +758,8 @@ static int blb_rocksdb_input(
   ( void )blb_rocksdb_val_encode( &v, val, val_len );
 
   ( void )snprintf(
-      th->scrtch_key,
-      ENGINE_THREAD_SCRTCH_SZ,
+      db->scrtch_key,
+      ROCKSDB_THREAD_SCRTCH_SZ,
       "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
       ( int )i->entry.rrname_len,
       i->entry.rrname,
@@ -767,8 +771,8 @@ static int blb_rocksdb_input(
       i->entry.rdata );
 
   ( void )snprintf(
-      th->scrtch_inv,
-      ENGINE_THREAD_SCRTCH_SZ,
+      db->scrtch_inv,
+      ROCKSDB_THREAD_SCRTCH_SZ,
       "i\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
       ( int )i->entry.rdata_len,
       i->entry.rdata,
@@ -783,8 +787,8 @@ static int blb_rocksdb_input(
   rocksdb_merge(
       db->db,
       db->writeoptions,
-      th->scrtch_key,
-      strlen( th->scrtch_key ),
+      db->scrtch_key,
+      strlen( db->scrtch_key ),
       val,
       val_len,
       &err );
@@ -798,8 +802,8 @@ static int blb_rocksdb_input(
   rocksdb_put(
       db->db,
       db->writeoptions,
-      th->scrtch_inv,
-      strlen( th->scrtch_inv ),
+      db->scrtch_inv,
+      strlen( db->scrtch_inv ),
       "",
       0,
       &err );
