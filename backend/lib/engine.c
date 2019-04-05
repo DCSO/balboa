@@ -22,7 +22,7 @@
 #define ENGINE_MAX_MESSAGE_SZ ENGINE_THREAD_SCRTCH_SZ
 #define ENGINE_MAX_MESSAGE_NODES ( 1024 )
 #define ENGINE_POLL_READ_TIMEOUT ( 60 )
-#define ENGINE_POLL_WRITE_TIMEOUT ( 10 )
+#define ENGINE_POLL_WRITE_TIMEOUT ( 30 )
 
 static atomic_int blb_engine_stop = ATOMIC_VAR_INIT( 0 );
 static atomic_int blb_thread_cnt = ATOMIC_VAR_INIT( 0 );
@@ -45,23 +45,6 @@ static void blb_thread_cnt_decr() {
 
 static int blb_thread_cnt_get() {
   return ( atomic_load( &blb_thread_cnt ) );
-}
-
-static int blb_thread_write_all( thread_t* th, char* _p, size_t _p_sz ) {
-  char* p = _p;
-  ssize_t r = _p_sz;
-  while( r > 0 ) {
-    ssize_t rc = write( th->fd, p, r );
-    if( rc < 0 ) {
-      L( prnl( "write() failed error `%s`", strerror( errno ) ) );
-      return ( -1 );
-    } else if( rc == 0 && errno == EINTR ) {
-      continue;
-    }
-    r -= rc;
-    p += rc;
-  }
-  return ( 0 );
 }
 
 static inline int blb_engine_poll_write( int fd, int seconds ) {
@@ -105,6 +88,28 @@ timeout_retry:
   } else if( rc < 0 ) {
     X( prnl( "select() failed `%s`", strerror( errno ) ) );
     return ( -1 );
+  }
+  return ( 0 );
+}
+
+static int blb_thread_write_all( thread_t* th, char* _p, size_t _p_sz ) {
+  int wr_ok = blb_engine_poll_write( th->fd, ENGINE_POLL_WRITE_TIMEOUT );
+  if( wr_ok != 0 ) {
+    L( prnl( "blb_engine_poll_write() timeout or error" ) );
+    return ( -1 );
+  }
+  char* p = _p;
+  ssize_t r = _p_sz;
+  while( r > 0 ) {
+    ssize_t rc = write( th->fd, p, r );
+    if( rc < 0 ) {
+      L( prnl( "write() failed error `%s`", strerror( errno ) ) );
+      return ( -1 );
+    } else if( rc == 0 && errno == EINTR ) {
+      continue;
+    }
+    r -= rc;
+    p += rc;
   }
   return ( 0 );
 }

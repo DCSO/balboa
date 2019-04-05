@@ -141,10 +141,10 @@ ssize_t blb_protocol_encode_entry(
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_COUNT_KEY );
   mpack_write_uint( wr, entry->count );
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY );
-  mpack_write_timestamp_seconds(wr,entry->first_seen);
+  mpack_write_timestamp_seconds( wr, entry->first_seen );
   // mpack_write_uint( wr, entry->first_seen );
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY );
-  mpack_write_timestamp_seconds(wr,entry->last_seen);
+  mpack_write_timestamp_seconds( wr, entry->last_seen );
   // mpack_write_uint( wr, entry->last_seen );
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RDATA_KEY );
   mpack_write_str( wr, entry->rdata, entry->rdata_len );
@@ -174,7 +174,7 @@ ssize_t blb_protocol_encode_input_request(
     const protocol_input_request_t* input, char* p, size_t p_sz ) {
   ssize_t used_inner = blb_protocol_encode_entry( &input->entry, p, p_sz );
   if( used_inner <= 0 ) {
-    L( prnl("blb_protocol_encode_entry() failed") );
+    L( prnl( "blb_protocol_encode_entry() failed" ) );
     return ( -1 );
   }
   return ( blb_protocol_encode_outer_request(
@@ -297,7 +297,8 @@ static int blb_protocol_decode_input(
   uint32_t cnt = mpack_expect_map( rd );
   mpack_error_t map_ok = mpack_reader_error( rd );
   if( cnt != 7 || map_ok != mpack_ok ) {
-    L( prnl( "invalid inner message: map with 7 elements expected got `%u`", cnt ) );
+    L( prnl(
+        "invalid inner message: map with 7 elements expected got `%u`", cnt ) );
     goto decode_error;
   }
 

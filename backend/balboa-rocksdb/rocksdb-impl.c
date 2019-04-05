@@ -318,7 +318,8 @@ static int blb_rocksdb_query_by_o(
       int tok_len;
     };
 
-    struct Tok toks[FIELDS] = {NULL};
+    struct Tok toks[FIELDS];
+    memset(toks,0,sizeof(toks));
 
     enum TokIdx j = RRNAME;
     size_t last = 1;
@@ -475,7 +476,8 @@ static int blb_rocksdb_query_by_i(
       int tok_len;
     };
 
-    struct Tok toks[FIELDS] = {NULL};
+    struct Tok toks[FIELDS];
+    memset(toks,0,sizeof(toks));
 
     enum TokIdx j = RRTYPE;
     size_t last = key_len;
@@ -667,7 +669,8 @@ static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
       int tok_len;
     };
 
-    struct Tok toks[FIELDS] = {NULL};
+    struct Tok toks[FIELDS];
+    memset(toks,0,sizeof(toks));
 
     enum TokIdx j = RRNAME;
     size_t last = 1;
