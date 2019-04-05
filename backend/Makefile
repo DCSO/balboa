@@ -11,3 +11,9 @@ console:
 
 mock:
 	${MAKE} -C balboa-mock
+
+
+clean:
+	${MAKE} -C balboa-mock clean
+	${MAKE} -C balboa-backend-console clean
+	${MAKE} -C balboa-rocksdb clean

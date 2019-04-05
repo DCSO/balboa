@@ -39,6 +39,8 @@ int main( int argc, char** argv ) {
     theTrace_set_verbosity( verbosity );
   }
 
+  blb_engine_signals_init();
+
   db_t* db = blb_mock_open();
   if( db == NULL ) { return ( 1 ); }
 

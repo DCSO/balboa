@@ -6,7 +6,13 @@ CCOMPILER?=gcc
 OUT=build/
 
 CFLAGS?=
-CFLAGS+=-pipe -s -Ofast -flto
+CFLAGS+=-pipe -Ofast -flto
+
+ifdef DEBUG
+CFLAGS+=-ggdb
+else
+CFLAGS+=-s
+endif
 
 ifeq ($(CCOMPILER),gcc)
 CFLAGS+=-fwhole-program -fmax-errors=3 -D__GCC__
