@@ -46,9 +46,7 @@ struct thread_t {
   db_t* db;
   void* usr_ctx;
   socket_t fd;
-  char scrtch[ENGINE_THREAD_SCRTCH_BUFFERS][ENGINE_THREAD_SCRTCH_SZ];
-  char scrtch_response_outer[ENGINE_THREAD_SCRTCH_SZ];
-  char scrtch_response_inner[ENGINE_THREAD_SCRTCH_SZ];
+  char scrtch_response[ENGINE_THREAD_SCRTCH_SZ];
   char scrtch_key[ENGINE_THREAD_SCRTCH_SZ];
   char scrtch_inv[ENGINE_THREAD_SCRTCH_SZ];
 };

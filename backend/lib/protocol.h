@@ -129,14 +129,27 @@ ssize_t blb_protocol_encode_stream_entry(
 ssize_t blb_protocol_encode_dump_entry(
     const protocol_entry_t* entry, char* p, size_t p_sz );
 
-// static size_t blb_thread_read_stream_cb(
-//    mpack_tree_t* tree, char* p, size_t p_sz ) {
-
 typedef struct protocol_stream_t protocol_stream_t;
 protocol_stream_t* blb_protocol_stream_new(
     void* usr,
     ssize_t ( *read_cb )( void* usr, char* p, size_t p_sz ),
     size_t max_sz,
     size_t max_nodes );
+
+typedef struct protocol_message_t protocol_message_t;
+struct protocol_message_t {
+  int ty;
+  union {
+    protocol_input_request_t input;
+    protocol_query_request_t query;
+    protocol_backup_request_t backup;
+    protocol_dump_request_t dump;
+    protocol_entry_t entry;
+  } u;
+};
+int blb_protocol_stream_decode(
+    protocol_stream_t* stream, protocol_message_t* out );
+
+void blb_protocol_stream_teardown( protocol_stream_t* stream );
 
 #endif

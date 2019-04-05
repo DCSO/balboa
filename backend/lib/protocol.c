@@ -1,12 +1,16 @@
 
+#include <mpack.h>
 #include <protocol.h>
 #include <trace.h>
-#include <mpack.h>
+
+#define PROTOCOL_SCRTCH_SZ ( 1024 * 10 )
+#define PROTOCOL_SCRTCH_BUFFERS ( 10 )
 
 struct protocol_stream_t {
   mpack_tree_t tree;
   void* usr;
   ssize_t ( *read_cb )( void* usr, char* p, size_t p_sz );
+  char scrtch[PROTOCOL_SCRTCH_BUFFERS][PROTOCOL_SCRTCH_SZ];
 };
 
 static ssize_t blb_protocol_encode_outer_request(
@@ -128,6 +132,55 @@ ssize_t blb_protocol_encode_dump_entry(
   return ( used );
 }
 
+ssize_t blb_protocol_encode_entry(
+    const protocol_entry_t* entry, char* p, size_t p_sz ) {
+  mpack_writer_t __wr = {0}, *wr = &__wr;
+  mpack_writer_init( wr, p, p_sz );
+
+  mpack_start_map( wr, 7 );
+  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_COUNT_KEY );
+  mpack_write_uint( wr, entry->count );
+  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY );
+  // mpack_write_timestamp_seconds(wr,entry->first_seen);
+  mpack_write_uint( wr, entry->first_seen );
+  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY );
+  // mpack_write_timestamp_seconds(wr,entry->last_seen);
+  mpack_write_uint( wr, entry->last_seen );
+  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RDATA_KEY );
+  mpack_write_str( wr, entry->rdata, entry->rdata_len );
+  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RRNAME_KEY );
+  mpack_write_str( wr, entry->rrname, entry->rrname_len );
+  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RRTYPE_KEY );
+  mpack_write_str( wr, entry->rrtype, entry->rrtype_len );
+  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_SENSORID_KEY );
+  mpack_write_str( wr, entry->sensorid, entry->sensorid_len );
+  mpack_finish_map( wr );
+
+  size_t used_inner = mpack_writer_buffer_used( wr );
+
+  mpack_error_t err = mpack_writer_error( wr );
+  if( err != mpack_ok ) {
+    L( prnl( "encoding inpot failed with mpack_error_t `%d`", err ) );
+    mpack_writer_destroy( wr );
+    return ( -1 );
+  }
+
+  mpack_writer_destroy( wr );
+
+  return ( used_inner );
+}
+
+ssize_t blb_protocol_encode_input_request(
+    const protocol_input_request_t* input, char* p, size_t p_sz ) {
+  ssize_t used_inner = blb_protocol_encode_entry( &input->entry, p, p_sz );
+  if( used_inner <= 0 ) {
+    L( prnl("blb_protocol_encode_entry() failed") );
+    return ( -1 );
+  }
+  return ( blb_protocol_encode_outer_request(
+      PROTOCOL_BACKUP_REQUEST, p, p_sz, used_inner ) );
+}
+
 ssize_t blb_protocol_encode_stream_start_response( char* p, size_t p_sz ) {
   return ( blb_protocol_encode_outer_request(
       PROTOCOL_QUERY_STREAM_START_RESPONSE, p, p_sz, 0 ) );
@@ -177,9 +230,12 @@ ssize_t blb_protocol_encode_stream_entry(
       PROTOCOL_BACKUP_REQUEST, p, p_sz, used_inner ) );
 }
 
+// read-from-stream api
+
 #define PROTOCOL_POLL_READ_TIMEOUT ( 60 )
 
-static size_t blb_protocol_stream_cb( mpack_tree_t* tree, char* p, size_t p_sz ) {
+static size_t blb_protocol_stream_cb(
+    mpack_tree_t* tree, char* p, size_t p_sz ) {
   protocol_stream_t* s = mpack_tree_context( tree );
 
   ssize_t rc = s->read_cb( s->usr, p, p_sz );
@@ -208,4 +264,398 @@ protocol_stream_t* blb_protocol_stream_new(
   mpack_tree_init_stream(
       &s->tree, blb_protocol_stream_cb, s, max_sz, max_nodes );
   return ( s );
+}
+
+void blb_protocol_stream_teardown( protocol_stream_t* stream ) {
+  if( stream == NULL ) { return; }
+  mpack_tree_destroy( &stream->tree );
+  blb_free( stream );
+}
+
+static int blb_protocol_decode_input(
+    protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out ) {
+  const char* p = mpack_node_bin_data( payload );
+  size_t p_sz = mpack_node_bin_size( payload );
+  T( prnl( "encoded message len %zu", p_sz ) );
+  if( p == NULL || p_sz == 0 ) {
+    L( prnl( "invalid message" ) );
+    return ( -1 );
+  }
+
+  WHEN_X {
+    theTrace_lock();
+    for( size_t i = 0; i < p_sz; i++ ) {
+      printf( "%02x ", ( int )( unsigned char )p[i] );
+    }
+    printf( "\n" );
+    theTrace_release();
+  }
+
+  mpack_reader_t __rd = {0}, *rd = &__rd;
+  mpack_reader_init( rd, ( char* )p, p_sz, p_sz );
+
+  uint32_t cnt = mpack_expect_map( rd );
+  mpack_error_t map_ok = mpack_reader_error( rd );
+  if( cnt != 7 || map_ok != mpack_ok ) {
+    L( prnl( "invalid inner message: map with 7 elements expected" ) );
+    goto decode_error;
+  }
+
+  ASSERT( cnt < PROTOCOL_SCRTCH_BUFFERS );
+
+  protocol_input_request_t* i = &out->u.input;
+  out->ty = PROTOCOL_INPUT_REQUEST;
+  uint32_t w = 0;
+  for( uint32_t j = 0; j < cnt; j++ ) {
+    char key[1] = {'\0'};
+    ( void )mpack_expect_str_buf( rd, key, 1 );
+    switch( key[0] ) {
+    case PROTOCOL_PDNS_ENTRY_COUNT_KEY0: {
+      X( prnl( "got input request count" ) );
+      i->entry.count = mpack_expect_int( rd );
+      break;
+    }
+    case PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY0: {
+      X( prnl( "got input request first seen" ) );
+      mpack_timestamp_t ts = mpack_expect_timestamp( rd );
+      i->entry.first_seen = ts.seconds;
+      break;
+    }
+    case PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY0: {
+      X( prnl( "got input request last seen" ) );
+      mpack_timestamp_t ts = mpack_expect_timestamp( rd );
+      i->entry.last_seen = ts.seconds;
+      break;
+    }
+    case PROTOCOL_PDNS_ENTRY_RRNAME_KEY0: {
+      X( prnl( "got input request rrname" ) );
+      i->entry.rrname_len =
+          mpack_expect_str_buf( rd, stream->scrtch[w], PROTOCOL_SCRTCH_SZ );
+      i->entry.rrname = stream->scrtch[w];
+      w++;
+      break;
+    }
+    case PROTOCOL_PDNS_ENTRY_RRTYPE_KEY0: {
+      X( prnl( "got input request rrtype" ) );
+      i->entry.rrtype_len =
+          mpack_expect_str_buf( rd, stream->scrtch[w], PROTOCOL_SCRTCH_SZ );
+      i->entry.rrtype = stream->scrtch[w];
+      w++;
+      break;
+    }
+    case PROTOCOL_PDNS_ENTRY_RDATA_KEY0: {
+      X( prnl( "got input request rdata" ) );
+      i->entry.rdata_len =
+          mpack_expect_str_buf( rd, stream->scrtch[w], PROTOCOL_SCRTCH_SZ );
+      i->entry.rdata = stream->scrtch[w];
+      w++;
+      break;
+    }
+    case PROTOCOL_PDNS_ENTRY_SENSORID_KEY0: {
+      X( prnl( "got input request sensorid" ) );
+      i->entry.sensorid_len =
+          mpack_expect_str_buf( rd, stream->scrtch[w], PROTOCOL_SCRTCH_SZ );
+      i->entry.sensorid = stream->scrtch[w];
+      w++;
+      break;
+    }
+    default:
+      V( prnl(
+          "invalid inner message: invalid key: %02x",
+          ( int )( unsigned char )key[0] ) );
+      return ( -1 );
+    }
+  }
+
+  mpack_done_map( rd );
+  if( mpack_reader_error( rd ) != mpack_ok ) {
+    V( prnl( "invalid inner message; map decode failed" ) );
+    goto decode_error;
+  }
+
+  mpack_reader_destroy( rd );
+  return ( 0 );
+
+decode_error:
+  mpack_reader_destroy( rd );
+  return ( -1 );
+}
+
+static int blb_protocol_decode_query(
+    protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out ) {
+  const char* p = mpack_node_bin_data( payload );
+  size_t p_sz = mpack_node_bin_size( payload );
+  T( prnl( "encoded message len %zu", p_sz ) );
+  if( p == NULL || p_sz == 0 ) {
+    L( prnl( "invalid message" ) );
+    return ( -1 );
+  }
+
+  WHEN_X {
+    theTrace_lock();
+    for( size_t i = 0; i < p_sz; i++ ) {
+      out( "%02x ", ( int )( unsigned char )p[i] );
+    }
+    out( "\n" );
+    theTrace_release();
+  }
+
+  mpack_reader_t __rd = {0}, *rd = &__rd;
+  mpack_reader_init( rd, ( char* )p, p_sz, p_sz );
+
+  uint32_t cnt = mpack_expect_map( rd );
+  if( cnt != 9 || mpack_reader_error( rd ) != mpack_ok ) {
+    V( prnl( "invalid inner message: query map expected" ) );
+    goto decode_error;
+  }
+
+  ASSERT( cnt < PROTOCOL_SCRTCH_BUFFERS );
+
+  struct have_t {
+    bool hrrname;
+    bool hrdata;
+    bool hrrtype;
+    bool hsensorid;
+  };
+
+  struct have_t __h = {0}, *h = &__h;
+  protocol_query_request_t* q = &out->u.query;
+  out->ty = PROTOCOL_QUERY_REQUEST;
+  uint32_t w = 0;
+  for( uint32_t j = 0; j < cnt; j++ ) {
+    char key[64] = {'\0'};
+    size_t key_len = mpack_expect_str_buf( rd, key, sizeof( key ) );
+    if( key_len <= 0 ) {
+      L( prnl( "invalid inner message: invalid key" ) );
+      goto decode_error;
+    }
+    if( strncmp( key, PROTOCOL_QUERY_REQUEST_LIMIT_KEY, key_len ) == 0 ) {
+      X( prnl( "got query request limit" ) );
+      q->limit = mpack_expect_int( rd );
+    } else if(
+        strncmp( key, PROTOCOL_QUERY_REQUEST_QRRNAME_KEY, key_len ) == 0 ) {
+      X( prnl( "got input request rrname" ) );
+      q->qrrname_len = mpack_expect_str_buf(
+          rd, stream->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
+      q->qrrname = stream->scrtch[w];
+      w++;
+    } else if(
+        strncmp( key, PROTOCOL_QUERY_REQUEST_HRRNAME_KEY, key_len ) == 0 ) {
+      X( prnl( "got input request have rrname" ) );
+      h->hrrname = mpack_expect_bool( rd );
+    } else if(
+        strncmp( key, PROTOCOL_QUERY_REQUEST_QRRTYPE_KEY, key_len ) == 0 ) {
+      X( prnl( "got input request rrtype" ) );
+      q->qrrtype_len = mpack_expect_str_buf(
+          rd, stream->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
+      q->qrrtype = stream->scrtch[w];
+      w++;
+    } else if(
+        strncmp( key, PROTOCOL_QUERY_REQUEST_HRRTYPE_KEY, key_len ) == 0 ) {
+      X( prnl( "got input request have rrtype" ) );
+      h->hrrtype = mpack_expect_bool( rd );
+    } else if(
+        strncmp( key, PROTOCOL_QUERY_REQUEST_QRDATA_KEY, key_len ) == 0 ) {
+      X( prnl( "got input request rdata" ) );
+      q->qrdata_len = mpack_expect_str_buf(
+          rd, stream->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
+      q->qrdata = stream->scrtch[w];
+      w++;
+    } else if(
+        strncmp( key, PROTOCOL_QUERY_REQUEST_HRDATA_KEY, key_len ) == 0 ) {
+      X( prnl( "got input request have rdata" ) );
+      h->hrdata = mpack_expect_bool( rd );
+    } else if(
+        strncmp( key, PROTOCOL_QUERY_REQUEST_QSENSORID_KEY, key_len ) == 0 ) {
+      X( prnl( "got input request sensorid" ) );
+      q->qsensorid_len = mpack_expect_str_buf(
+          rd, stream->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
+      q->qsensorid = stream->scrtch[w];
+      w++;
+    } else if(
+        strncmp( key, PROTOCOL_QUERY_REQUEST_HSENSORID_KEY, key_len ) == 0 ) {
+      X( prnl( "got input request have sensorid" ) );
+      h->hsensorid = mpack_expect_bool( rd );
+    } else {
+      L( prnl(
+          "invalid inner message: unkown key: `%.*s`", ( int )key_len, key ) );
+      goto decode_error;
+    }
+  }
+  mpack_done_map( rd );
+  if( mpack_reader_error( rd ) != mpack_ok ) {
+    L( prnl( "invalid inner message; decode query request failed" ) );
+    goto decode_error;
+  }
+
+  if( !h->hsensorid ) { q->qsensorid_len = 0; }
+  if( !h->hrrname ) { q->qrrname_len = 0; }
+  if( !h->hrrtype ) { q->qrrtype_len = 0; }
+  if( !h->hrdata ) { q->qrdata_len = 0; }
+
+  mpack_reader_destroy( rd );
+  return ( 0 );
+
+decode_error:
+  mpack_reader_destroy( rd );
+  return ( -1 );
+}
+
+static int blb_protocol_decode_backup(
+    protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out ) {
+  const char* p = mpack_node_bin_data( payload );
+  size_t p_sz = mpack_node_bin_size( payload );
+  T( prnl( "encoded message len %zu", p_sz ) );
+  if( p == NULL || p_sz == 0 ) {
+    L( prnl( "invalid message" ) );
+    return ( -1 );
+  }
+
+  WHEN_X {
+    theTrace_lock();
+    for( size_t i = 0; i < p_sz; i++ ) {
+      out( "%02x ", ( int )( unsigned char )p[i] );
+    }
+    out( "\n" );
+    theTrace_release();
+  }
+
+  mpack_reader_t __rd = {0}, *rd = &__rd;
+  mpack_reader_init( rd, ( char* )p, p_sz, p_sz );
+
+  uint32_t cnt = mpack_expect_map( rd );
+  if( cnt != 1 || mpack_reader_error( rd ) != mpack_ok ) {
+    L( prnl( "invalid inner message: backup map expected" ) );
+    goto decode_error;
+  }
+
+  ASSERT( cnt < PROTOCOL_SCRTCH_BUFFERS );
+
+  char key[1] = {'\0'};
+  ( void )mpack_expect_str_buf( rd, key, 1 );
+  if( key[0] != PROTOCOL_BACKUP_REQUEST_PATH_KEY[0] ) {
+    L( prnl( "invalid inner message: path key expected" ) );
+    goto decode_error;
+  }
+
+  protocol_backup_request_t* b = &out->u.backup;
+  out->ty = PROTOCOL_BACKUP_REQUEST;
+  b->path_len =
+      mpack_expect_str_buf( rd, stream->scrtch[0], PROTOCOL_SCRTCH_SZ );
+  b->path = stream->scrtch[0];
+
+  mpack_done_map( rd );
+  if( mpack_reader_error( rd ) != mpack_ok ) {
+    L( prnl( "invalid inner message; decode backup request failed" ) );
+    goto decode_error;
+  }
+
+  mpack_reader_destroy( rd );
+  return ( 0 );
+
+decode_error:
+  mpack_reader_destroy( rd );
+  return ( -1 );
+}
+
+static int blb_protocol_decode_dump(
+    protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out ) {
+  const char* p = mpack_node_bin_data( payload );
+  size_t p_sz = mpack_node_bin_size( payload );
+  T( prnl( "encoded message len %zu", p_sz ) );
+  if( p == NULL || p_sz == 0 ) {
+    L( prnl( "invalid message" ) );
+    return ( -1 );
+  }
+
+  WHEN_X {
+    theTrace_lock();
+    for( size_t i = 0; i < p_sz; i++ ) {
+      out( "%02x ", ( int )( unsigned char )p[i] );
+    }
+    out( "\n" );
+    theTrace_release();
+  }
+
+  mpack_reader_t __rd = {0}, *rd = &__rd;
+  mpack_reader_init( rd, ( char* )p, p_sz, p_sz );
+
+  uint32_t cnt = mpack_expect_map( rd );
+  if( cnt != 1 || mpack_reader_error( rd ) != mpack_ok ) {
+    L( prnl( "invalid inner message: dump map expected" ) );
+    goto decode_error;
+  }
+
+  ASSERT( cnt < PROTOCOL_SCRTCH_BUFFERS );
+
+  char key[1] = {'\0'};
+  ( void )mpack_expect_str_buf( rd, key, 1 );
+  if( key[0] != PROTOCOL_DUMP_REQUEST_PATH_KEY[0] ) {
+    L( prnl( "invalid inner message: path key expected" ) );
+    goto decode_error;
+  }
+
+  protocol_dump_request_t* d = &out->u.dump;
+  out->ty = PROTOCOL_DUMP_REQUEST;
+  d->path_len =
+      mpack_expect_str_buf( rd, stream->scrtch[0], PROTOCOL_SCRTCH_SZ );
+  d->path = stream->scrtch[0];
+
+  mpack_done_map( rd );
+  if( mpack_reader_error( rd ) != mpack_ok ) {
+    L( prnl( "invalid inner message; decode dump request failed" ) );
+    goto decode_error;
+  }
+
+  mpack_reader_destroy( rd );
+  return ( 0 );
+
+decode_error:
+  mpack_reader_destroy( rd );
+  return ( -1 );
+}
+
+int blb_protocol_stream_decode(
+    protocol_stream_t* stream, protocol_message_t* out ) {
+  mpack_tree_t* tree = &stream->tree;
+  mpack_tree_parse( tree );
+  if( mpack_tree_error( tree ) != mpack_ok ) { return ( -1 ); }
+
+  mpack_node_t root = mpack_tree_root( tree );
+  WHEN_X {
+    theTrace_lock();
+    prnl(
+        "got message kv-pairs=%zu tree-size=%zu",
+        mpack_node_map_count( root ),
+        mpack_tree_size( tree ) );
+    for( size_t i = 0; i < mpack_node_map_count( root ); i++ ) {
+      mpack_node_t key = mpack_node_map_key_at( root, i );
+      prnl( "key[%zu]=%.*s", i, 1, mpack_node_str( key ) );
+    }
+    theTrace_release();
+  }
+
+  mpack_node_t type =
+      mpack_node_map_cstr( root, PROTOCOL_TYPED_MESSAGE_TYPE_KEY );
+  mpack_node_t payload =
+      mpack_node_map_cstr( root, PROTOCOL_TYPED_MESSAGE_ENCODED_KEY );
+  if( mpack_node_is_nil( type ) || mpack_node_is_nil( payload ) ) {
+    L( prnl( "invalid message received" ) );
+    return ( -1 );
+  }
+  switch( mpack_node_int( type ) ) {
+  case PROTOCOL_INPUT_REQUEST:
+    X( prnl( "got input request" ) );
+    return ( blb_protocol_decode_input( stream, payload, out ) );
+  case PROTOCOL_QUERY_REQUEST:
+    X( prnl( "got query request" ) );
+    return ( blb_protocol_decode_query( stream, payload, out ) );
+  case PROTOCOL_BACKUP_REQUEST:
+    X( prnl( "got backup request" ) );
+    return ( blb_protocol_decode_backup( stream, payload, out ) );
+  case PROTOCOL_DUMP_REQUEST:
+    X( prnl( "got dump request" ) );
+    return ( blb_protocol_decode_dump( stream, payload, out ) );
+  default: L( prnl( "invalid message type" ) ); return ( -1 );
+  }
 }

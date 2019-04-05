@@ -16,11 +16,10 @@
 #include <unistd.h>
 
 #include <engine.h>
-#include <mpack.h>
 #include <protocol.h>
 #include <trace.h>
 
-#define ENGINE_MAX_MESSAGE_SZ ( 128 * 1024 * 1024 )
+#define ENGINE_MAX_MESSAGE_SZ ENGINE_THREAD_SCRTCH_SZ
 #define ENGINE_MAX_MESSAGE_NODES ( 1024 )
 #define ENGINE_POLL_READ_TIMEOUT ( 60 )
 #define ENGINE_POLL_WRITE_TIMEOUT ( 10 )
@@ -110,447 +109,6 @@ timeout_retry:
   return ( 0 );
 }
 
-static size_t blb_thread_read_stream_cb(
-    mpack_tree_t* tree, char* p, size_t p_sz ) {
-  thread_t* th = mpack_tree_context( tree );
-  int fd_ok = blb_engine_poll_read( th->fd, ENGINE_POLL_READ_TIMEOUT );
-  if( fd_ok != 0 ) {
-    V( prnl( "engine poll read failed" ) );
-    mpack_tree_flag_error( tree, mpack_error_io );
-    return ( 0 );
-  }
-  ssize_t rc = read( th->fd, p, p_sz );
-  if( rc < 0 ) {
-    V( prnl( "read() failed: `%s`", strerror( errno ) ) );
-    mpack_tree_flag_error( tree, mpack_error_io );
-  } else if( rc == 0 ) {
-    X( prnl( "read() eof" ) );
-    mpack_tree_flag_error( tree, mpack_error_eof );
-  }
-  return ( rc );
-}
-
-static int blb_engine_thread_consume_backup( thread_t* th, mpack_node_t node ) {
-  ( void )th;
-  const char* p = mpack_node_bin_data( node );
-  size_t p_sz = mpack_node_bin_size( node );
-  T( prnl( "encoded message len %zu", p_sz ) );
-  if( p == NULL || p_sz == 0 ) {
-    V( prnl( "invalid input request" ) );
-    return ( -1 );
-  }
-
-  WHEN_X {
-    theTrace_lock();
-    for( size_t i = 0; i < p_sz; i++ ) {
-      out( "%02x ", ( int )( unsigned char )p[i] );
-    }
-    out( "\n" );
-    theTrace_release();
-  }
-
-  mpack_reader_t __rd = {0}, *rd = &__rd;
-  mpack_reader_init( rd, ( char* )p, p_sz, p_sz );
-
-  uint32_t cnt = mpack_expect_map( rd );
-  if( cnt != 1 || mpack_reader_error( rd ) != mpack_ok ) {
-    V( prnl( "invalid inner message: backup map expected" ) );
-    goto decode_error;
-  }
-
-  ASSERT( cnt < ENGINE_THREAD_SCRTCH_BUFFERS );
-
-  char key[1] = {'\0'};
-  ( void )mpack_expect_str_buf( rd, key, 1 );
-  if( key[0] != PROTOCOL_BACKUP_REQUEST_PATH_KEY[0] ) {
-    V( prnl( "invalid inner message: path key expected" ) );
-    goto decode_error;
-  }
-
-  protocol_backup_request_t __b, *b = &__b;
-  b->path_len =
-      mpack_expect_str_buf( rd, th->scrtch[0], ENGINE_THREAD_SCRTCH_SZ );
-  b->path = th->scrtch[0];
-
-  mpack_done_map( rd );
-  if( mpack_reader_error( rd ) != mpack_ok ) {
-    L( prnl( "invalid inner message; decode backup request failed" ) );
-    goto decode_error;
-  }
-
-  mpack_reader_destroy( rd );
-
-  blb_dbi_backup( th, b );
-
-  return ( 0 );
-
-decode_error:
-  mpack_reader_destroy( rd );
-  return ( -1 );
-}
-
-static int blb_engine_thread_consume_dump( thread_t* th, mpack_node_t node ) {
-  ( void )th;
-  const char* p = mpack_node_bin_data( node );
-  size_t p_sz = mpack_node_bin_size( node );
-  T( prnl( "encoded message len %zu", p_sz ) );
-  if( p == NULL || p_sz == 0 ) {
-    V( prnl( "invalid input request" ) );
-    return ( -1 );
-  }
-
-  WHEN_X {
-    theTrace_lock();
-    for( size_t i = 0; i < p_sz; i++ ) {
-      out( "%02x ", ( int )( unsigned char )p[i] );
-    }
-    out( "\n" );
-    theTrace_release();
-  }
-
-  mpack_reader_t __rd = {0}, *rd = &__rd;
-  mpack_reader_init( rd, ( char* )p, p_sz, p_sz );
-
-  uint32_t cnt = mpack_expect_map( rd );
-  if( cnt != 1 || mpack_reader_error( rd ) != mpack_ok ) {
-    V( prnl( "invalid inner message: dump map expected" ) );
-    goto decode_error;
-  }
-
-  ASSERT( cnt < ENGINE_THREAD_SCRTCH_BUFFERS );
-
-  char key[1] = {'\0'};
-  ( void )mpack_expect_str_buf( rd, key, 1 );
-  if( key[0] != PROTOCOL_DUMP_REQUEST_PATH_KEY[0] ) {
-    V( prnl( "invalid inner message: path key expected" ) );
-    goto decode_error;
-  }
-
-  protocol_dump_request_t __d, *d = &__d;
-  d->path_len =
-      mpack_expect_str_buf( rd, th->scrtch[0], ENGINE_THREAD_SCRTCH_SZ );
-  d->path = th->scrtch[0];
-
-  mpack_done_map( rd );
-  if( mpack_reader_error( rd ) != mpack_ok ) {
-    L( prnl( "invalid inner message; decode dump request failed" ) );
-    goto decode_error;
-  }
-
-  mpack_reader_destroy( rd );
-
-  blb_dbi_dump( th, d );
-
-  return ( 0 );
-
-decode_error:
-  mpack_reader_destroy( rd );
-  return ( -1 );
-}
-
-static int blb_engine_thread_consume_query( thread_t* th, mpack_node_t node ) {
-  ( void )th;
-  const char* p = mpack_node_bin_data( node );
-  size_t p_sz = mpack_node_bin_size( node );
-  T( prnl( "encoded message len %zu", p_sz ) );
-  if( p == NULL || p_sz == 0 ) {
-    V( prnl( "invalid input request" ) );
-    return ( -1 );
-  }
-
-  WHEN_X {
-    theTrace_lock();
-    for( size_t i = 0; i < p_sz; i++ ) {
-      out( "%02x ", ( int )( unsigned char )p[i] );
-    }
-    out( "\n" );
-    theTrace_release();
-  }
-
-  mpack_reader_t __rd = {0}, *rd = &__rd;
-  mpack_reader_init( rd, ( char* )p, p_sz, p_sz );
-
-  uint32_t cnt = mpack_expect_map( rd );
-  if( cnt != 9 || mpack_reader_error( rd ) != mpack_ok ) {
-    V( prnl( "invalid inner message: query map expected" ) );
-    goto decode_error;
-  }
-
-  ASSERT( cnt < ENGINE_THREAD_SCRTCH_BUFFERS );
-
-  struct have_t {
-    bool hrrname;
-    bool hrdata;
-    bool hrrtype;
-    bool hsensorid;
-  };
-
-  struct have_t __h = {0}, *h = &__h;
-  protocol_query_request_t __q = {0}, *q = &__q;
-  uint32_t w = 0;
-  for( uint32_t j = 0; j < cnt; j++ ) {
-    char key[64] = {'\0'};
-    size_t key_len = mpack_expect_str_buf( rd, key, 64 );
-    if( key_len <= 0 ) {
-      V( prnl( "invalid inner message: invalid key" ) );
-      goto decode_error;
-    }
-    if( strncmp( key, PROTOCOL_QUERY_REQUEST_LIMIT_KEY, key_len ) == 0 ) {
-      X( prnl( "got query request limit" ) );
-      q->limit = mpack_expect_int( rd );
-    } else if(
-        strncmp( key, PROTOCOL_QUERY_REQUEST_QRRNAME_KEY, key_len ) == 0 ) {
-      X( prnl( "got input request rrname" ) );
-      q->qrrname_len =
-          mpack_expect_str_buf( rd, th->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
-      q->qrrname = th->scrtch[w];
-      w++;
-    } else if(
-        strncmp( key, PROTOCOL_QUERY_REQUEST_HRRNAME_KEY, key_len ) == 0 ) {
-      X( prnl( "got input request have rrname" ) );
-      h->hrrname = mpack_expect_bool( rd );
-    } else if(
-        strncmp( key, PROTOCOL_QUERY_REQUEST_QRRTYPE_KEY, key_len ) == 0 ) {
-      X( prnl( "got input request rrtype" ) );
-      q->qrrtype_len =
-          mpack_expect_str_buf( rd, th->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
-      q->qrrtype = th->scrtch[w];
-      w++;
-    } else if(
-        strncmp( key, PROTOCOL_QUERY_REQUEST_HRRTYPE_KEY, key_len ) == 0 ) {
-      X( prnl( "got input request have rrtype" ) );
-      h->hrrtype = mpack_expect_bool( rd );
-    } else if(
-        strncmp( key, PROTOCOL_QUERY_REQUEST_QRDATA_KEY, key_len ) == 0 ) {
-      X( prnl( "got input request rdata" ) );
-      q->qrdata_len =
-          mpack_expect_str_buf( rd, th->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
-      q->qrdata = th->scrtch[w];
-      w++;
-    } else if(
-        strncmp( key, PROTOCOL_QUERY_REQUEST_HRDATA_KEY, key_len ) == 0 ) {
-      X( prnl( "got input request have rdata" ) );
-      h->hrdata = mpack_expect_bool( rd );
-    } else if(
-        strncmp( key, PROTOCOL_QUERY_REQUEST_QSENSORID_KEY, key_len ) == 0 ) {
-      X( prnl( "got input request sensorid" ) );
-      q->qsensorid_len =
-          mpack_expect_str_buf( rd, th->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
-      q->qsensorid = th->scrtch[w];
-      w++;
-    } else if(
-        strncmp( key, PROTOCOL_QUERY_REQUEST_HSENSORID_KEY, key_len ) == 0 ) {
-      X( prnl( "got input request have sensorid" ) );
-      h->hsensorid = mpack_expect_bool( rd );
-    } else {
-      V( prnl(
-          "invalid inner message: unkown key: `%.*s`", ( int )key_len, key ) );
-      goto decode_error;
-    }
-  }
-  mpack_done_map( rd );
-  if( mpack_reader_error( rd ) != mpack_ok ) {
-    L( prnl( "invalid inner message; decode query request failed" ) );
-    goto decode_error;
-  }
-
-  if( !h->hsensorid ) { q->qsensorid_len = 0; }
-  if( !h->hrrname ) { q->qrrname_len = 0; }
-  if( !h->hrrtype ) { q->qrrtype_len = 0; }
-  if( !h->hrdata ) { q->qrdata_len = 0; }
-
-  int input_ok = blb_dbi_query( th, q );
-  if( input_ok != 0 ) {
-    V( prnl( "input request failed" ) );
-    goto decode_error;
-  }
-
-  mpack_reader_destroy( rd );
-  return ( 0 );
-
-decode_error:
-  mpack_reader_destroy( rd );
-  return ( -1 );
-}
-
-static int blb_engine_thread_consume_input( thread_t* th, mpack_node_t node ) {
-  ( void )th;
-  const char* p = mpack_node_bin_data( node );
-  size_t p_sz = mpack_node_bin_size( node );
-  T( prnl( "encoded message len %zu", p_sz ) );
-  if( p == NULL || p_sz == 0 ) {
-    V( prnl( "invalid input request" ) );
-    return ( -1 );
-  }
-
-  WHEN_X {
-    theTrace_lock();
-    for( size_t i = 0; i < p_sz; i++ ) {
-      printf( "%02x ", ( int )( unsigned char )p[i] );
-    }
-    printf( "\n" );
-    theTrace_release();
-  }
-
-  mpack_reader_t __rd = {0}, *rd = &__rd;
-  mpack_reader_init( rd, ( char* )p, p_sz, p_sz );
-
-  uint32_t cnt = mpack_expect_map( rd );
-  if( cnt != 1 || mpack_reader_error( rd ) != mpack_ok ) {
-    V( prnl( "invalid inner message: observation map expected" ) );
-    goto decode_error;
-  }
-
-  char key[1] = {'\0'};
-  ( void )mpack_expect_str_buf( rd, key, 1 );
-  if( key[0] != PROTOCOL_INPUT_REQUEST_OBSERVATION_KEY0 ) {
-    V( prnl( "invalid inner message: observation key expected" ) );
-    goto decode_error;
-  }
-
-  uint32_t input_cnt = mpack_expect_array( rd );
-  mpack_error_t array_ok = mpack_reader_error( rd );
-  if( array_ok != mpack_ok || input_cnt == 0 ) {
-    V( prnl( "invalid inner message: array expected" ) );
-    goto decode_error;
-  }
-
-  for( uint32_t k = 0; k < input_cnt; k++ ) {
-    uint32_t cnt = mpack_expect_map( rd );
-    mpack_error_t map_ok = mpack_reader_error( rd );
-    if( map_ok != mpack_ok || cnt != 7 ) {
-      V( prnl( "invalid inner message: map with 7 elements expected" ) );
-      goto decode_error;
-    }
-    ASSERT( cnt < ENGINE_THREAD_SCRTCH_BUFFERS );
-    protocol_input_request_t __i = {0}, *i = &__i;
-    uint32_t w = 0;
-    for( uint32_t j = 0; j < cnt; j++ ) {
-      char key[1] = {'\0'};
-      ( void )mpack_expect_str_buf( rd, key, 1 );
-      switch( key[0] ) {
-      case PROTOCOL_PDNS_ENTRY_COUNT_KEY0: {
-        X( prnl( "got input request count" ) );
-        i->entry.count = mpack_expect_int( rd );
-        break;
-      }
-      case PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY0: {
-        X( prnl( "got input request first seen" ) );
-        mpack_timestamp_t ts = mpack_expect_timestamp( rd );
-        i->entry.first_seen = ts.seconds;
-        break;
-      }
-      case PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY0: {
-        X( prnl( "got input request last seen" ) );
-        mpack_timestamp_t ts = mpack_expect_timestamp( rd );
-        i->entry.last_seen = ts.seconds;
-        break;
-      }
-      case PROTOCOL_PDNS_ENTRY_RRNAME_KEY0: {
-        X( prnl( "got input request rrname" ) );
-        i->entry.rrname_len =
-            mpack_expect_str_buf( rd, th->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
-        i->entry.rrname = th->scrtch[w];
-        w++;
-        break;
-      }
-      case PROTOCOL_PDNS_ENTRY_RRTYPE_KEY0: {
-        X( prnl( "got input request rrtype" ) );
-        i->entry.rrtype_len =
-            mpack_expect_str_buf( rd, th->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
-        i->entry.rrtype = th->scrtch[w];
-        w++;
-        break;
-      }
-      case PROTOCOL_PDNS_ENTRY_RDATA_KEY0: {
-        X( prnl( "got input request rdata" ) );
-        i->entry.rdata_len =
-            mpack_expect_str_buf( rd, th->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
-        i->entry.rdata = th->scrtch[w];
-        w++;
-        break;
-      }
-      case PROTOCOL_PDNS_ENTRY_SENSORID_KEY0: {
-        X( prnl( "got input request sensorid" ) );
-        i->entry.sensorid_len =
-            mpack_expect_str_buf( rd, th->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
-        i->entry.sensorid = th->scrtch[w];
-        w++;
-        break;
-      }
-      default:
-        V( prnl(
-            "invalid inner message: invalid key: %02x",
-            ( int )( unsigned char )key[0] ) );
-        return ( -1 );
-      }
-    }
-    mpack_done_map( rd );
-    if( mpack_reader_error( rd ) != mpack_ok ) {
-      V( prnl( "invalid inner message; map decode failed" ) );
-      goto decode_error;
-    }
-    int input_ok = blb_dbi_input( th, i );
-    if( input_ok != 0 ) {
-      V( prnl( "input request failed" ) );
-      goto decode_error;
-    }
-  }
-  mpack_done_array( rd );
-  mpack_done_map( rd );
-  if( mpack_reader_error( rd ) != mpack_ok ) {
-    V( prnl( "invalid inner message: array decode failed" ) );
-    goto decode_error;
-  }
-
-  mpack_reader_destroy( rd );
-  return ( 0 );
-
-decode_error:
-  mpack_reader_destroy( rd );
-  return ( -1 );
-}
-
-static int blb_engine_thread_consume( thread_t* th, mpack_tree_t* tree ) {
-  mpack_node_t root = mpack_tree_root( tree );
-  WHEN_X {
-    theTrace_lock();
-    prnl(
-        "got message kv-pairs=%zu tree-size=%zu",
-        mpack_node_map_count( root ),
-        mpack_tree_size( tree ) );
-    for( size_t i = 0; i < mpack_node_map_count( root ); i++ ) {
-      mpack_node_t key = mpack_node_map_key_at( root, i );
-      prnl( "key[%zu]=%.*s", i, 1, mpack_node_str( key ) );
-    }
-    theTrace_release();
-  }
-
-  mpack_node_t type =
-      mpack_node_map_cstr( root, PROTOCOL_TYPED_MESSAGE_TYPE_KEY );
-  mpack_node_t payload =
-      mpack_node_map_cstr( root, PROTOCOL_TYPED_MESSAGE_ENCODED_KEY );
-  if( mpack_node_is_nil( type ) || mpack_node_is_nil( payload ) ) {
-    V( prnl( "invalid message received" ) );
-    return ( -1 );
-  }
-  switch( mpack_node_int( type ) ) {
-  case PROTOCOL_INPUT_REQUEST:
-    T( prnl( "got input request" ) );
-    return ( blb_engine_thread_consume_input( th, payload ) );
-  case PROTOCOL_QUERY_REQUEST:
-    T( prnl( "got query request" ) );
-    return ( blb_engine_thread_consume_query( th, payload ) );
-  case PROTOCOL_BACKUP_REQUEST:
-    T( prnl( "got backup request" ) );
-    return ( blb_engine_thread_consume_backup( th, payload ) );
-  case PROTOCOL_DUMP_REQUEST:
-    T( prnl( "got dump request" ) );
-    return ( blb_engine_thread_consume_dump( th, payload ) );
-  default: T( prnl( "invalid message type" ) ); return ( -1 );
-  }
-}
-
 int blb_thread_query_stream_start_response( thread_t* th ) {
   if( blb_engine_poll_stop() > 0 ) {
     L( prnl( "thread <%04lx> engine stop detected", th->thread ) );
@@ -558,13 +116,13 @@ int blb_thread_query_stream_start_response( thread_t* th ) {
   }
 
   ssize_t used = blb_protocol_encode_stream_start_response(
-      th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
+      th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
   if( used <= 0 ) {
     L( prnl( "blb_protocol_encode_stream_start_response() failed" ) );
     return ( -1 );
   }
 
-  return ( blb_thread_write_all( th, th->scrtch_response_outer, used ) );
+  return ( blb_thread_write_all( th, th->scrtch_response, used ) );
 }
 
 int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
@@ -591,13 +149,13 @@ int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
   }
 
   ssize_t used = blb_protocol_encode_dump_entry(
-      entry, th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
+      entry, th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
   if( used <= 0 ) {
     L( prnl( "blb_protocol_encode_dump_entry() failed" ) );
     return ( -1 );
   }
 
-  return ( blb_thread_write_all( th, th->scrtch_response_outer, used ) );
+  return ( blb_thread_write_all( th, th->scrtch_response, used ) );
 }
 
 int blb_thread_query_stream_push_response(
@@ -625,13 +183,13 @@ int blb_thread_query_stream_push_response(
   }
 
   ssize_t used = blb_protocol_encode_stream_entry(
-      entry, th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
+      entry, th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
   if( used <= 0 ) {
     L( prnl( "blb_protocol_encode_stream_entry() failed" ) );
     return ( -1 );
   }
 
-  return ( blb_thread_write_all( th, th->scrtch_response_outer, used ) );
+  return ( blb_thread_write_all( th, th->scrtch_response, used ) );
 }
 
 int blb_thread_query_stream_end_response( thread_t* th ) {
@@ -641,7 +199,7 @@ int blb_thread_query_stream_end_response( thread_t* th ) {
   }
 
   ssize_t used = blb_protocol_encode_stream_end_response(
-      th->scrtch_response_outer, ENGINE_MAX_MESSAGE_SZ );
+      th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
   if( used <= 0 ) {
     L( prnl( "blb_protocol_encode_stream_end_response() failed" ) );
     return ( -1 );
@@ -649,7 +207,7 @@ int blb_thread_query_stream_end_response( thread_t* th ) {
 
   X( prnl( "blb_protocol_encode_stream_end_response() returned `%zd`", used ) );
 
-  return ( blb_thread_write_all( th, th->scrtch_response_outer, used ) );
+  return ( blb_thread_write_all( th, th->scrtch_response, used ) );
 }
 
 static thread_t* blb_engine_thread_new( engine_t* e, int fd ) {
@@ -673,34 +231,105 @@ static void blb_engine_thread_teardown( thread_t* th ) {
   blb_free( th );
 }
 
+static ssize_t blb_thread_read_stream_cb( void* usr, char* p, size_t p_sz ) {
+  thread_t* th = usr;
+  int fd_ok = blb_engine_poll_read( th->fd, ENGINE_POLL_READ_TIMEOUT );
+  if( fd_ok != 0 ) {
+    V( prnl( "engine poll read failed" ) );
+    return ( 0 );
+  }
+  ssize_t rc = read( th->fd, p, p_sz );
+  if( rc < 0 ) {
+    V( prnl( "read() failed: `%s`", strerror( errno ) ) );
+    return ( -1 );
+  } else if( rc == 0 ) {
+    X( prnl( "read() eof" ) );
+    return ( 0 );
+  }
+  return ( rc );
+}
+
+static inline int blb_engine_thread_consume_backup(
+    thread_t* th, const protocol_backup_request_t* backup ) {
+  blb_dbi_backup( th, backup );
+  return ( 0 );
+}
+
+static inline int blb_engine_thread_consume_dump(
+    thread_t* th, const protocol_dump_request_t* dump ) {
+  blb_dbi_dump( th, dump );
+  return ( 0 );
+}
+
+static inline int blb_engine_thread_consume_query(
+    thread_t* th, const protocol_query_request_t* query ) {
+  int query_ok = blb_dbi_query( th, query );
+  if( query_ok != 0 ) {
+    L( prnl( "blb_dbi_query() failed" ) );
+    return ( -1 );
+  }
+  return ( 0 );
+}
+
+static inline int blb_engine_thread_consume_input(
+    thread_t* th, const protocol_input_request_t* input ) {
+  int input_ok = blb_dbi_input( th, input );
+  if( input_ok != 0 ) {
+    L( prnl( "blb_dbi_input() failed" ) );
+    return ( -1 );
+  }
+  return ( 0 );
+}
+
+static inline int blb_engine_thread_consume(
+    thread_t* th, protocol_message_t* msg ) {
+  switch( msg->ty ) {
+  case PROTOCOL_INPUT_REQUEST:
+    return ( blb_engine_thread_consume_input( th, &msg->u.input ) );
+  case PROTOCOL_BACKUP_REQUEST:
+    return ( blb_engine_thread_consume_backup( th, &msg->u.backup ) );
+  case PROTOCOL_DUMP_REQUEST:
+    return ( blb_engine_thread_consume_dump( th, &msg->u.dump ) );
+  case PROTOCOL_QUERY_REQUEST:
+    return ( blb_engine_thread_consume_query( th, &msg->u.query ) );
+  default: L( prnl( "invalid message type `%d`", msg->ty ) ); return ( -1 );
+  }
+}
+
 static void* blb_engine_thread_fn( void* usr ) {
   ASSERT( usr != NULL );
   thread_t* th = usr;
   blb_thread_cnt_incr();
   T( prnl( "new thread is <%04lx>", th->thread ) );
 
-  mpack_tree_t __tree, *tree = &__tree;
-  mpack_tree_init_stream(
-      tree,
-      blb_thread_read_stream_cb,
+  protocol_stream_t* stream = blb_protocol_stream_new(
       th,
+      blb_thread_read_stream_cb,
       ENGINE_MAX_MESSAGE_SZ,
       ENGINE_MAX_MESSAGE_NODES );
+  if( stream == NULL ) {
+    L( prnl( "unalbe to create protocol decode stream" ) );
+    goto thread_exit;
+  }
 
+  protocol_message_t msg;
   while( 1 ) {
     if( blb_engine_poll_stop() > 0 ) {
       V( prnl( "thread <%04lx> engine stop detected", th->thread ) );
       goto thread_exit;
     }
-    mpack_tree_parse( tree );
-    if( mpack_tree_error( tree ) != mpack_ok ) { goto thread_exit; }
-    int rc = blb_engine_thread_consume( th, tree );
-    if( rc != 0 ) { goto thread_exit; }
+    int rc = blb_protocol_stream_decode( stream, &msg );
+    if( rc != 0 ) {
+      L( prnl( "protocol_stream_decode() failed" ) );
+      goto thread_exit;
+    }
+    int th_rc = blb_engine_thread_consume( th, &msg );
+    if( th_rc != 0 ) { goto thread_exit; }
   }
 
 thread_exit:
   T( prnl( "finished thread is <%04lx>", th->thread ) );
-  mpack_tree_destroy( tree );
+  if( stream != NULL ) { blb_protocol_stream_teardown( stream ); }
   blb_thread_cnt_decr();
   blb_engine_thread_teardown( th );
   return ( NULL );
@@ -760,8 +389,6 @@ static void* blb_engine_signal_consume( void* usr ) {
   sigaddset( &s, SIGPIPE );
   sigaddset( &s, SIGTERM );
   V( prnl( "signal consumer thread started" ) );
-  // int unblock_ok=pthread_sigmask(SIG_UNBLOCK,s,NULL);
-  // V(prnl("pthread_sigmask returned `%d`",unblock_ok));
   while( 1 ) {
     int sig = 0;
     int rc = sigwait( &s, &sig );

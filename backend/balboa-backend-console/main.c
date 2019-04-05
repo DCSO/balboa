@@ -228,60 +228,16 @@ static int dump_entry_json_cb( state_t* state, protocol_entry_t* entry ) {
 
 static int dump_entry_replay_cb( state_t* state, protocol_entry_t* entry ) {
   ASSERT( state->sock != -1 );
-  mpack_writer_t __wr = {0}, *wr = &__wr;
-  // encode inner message
-  mpack_writer_init( wr, ( char* )state->scrtch1, state->scrtch1_sz );
-  mpack_start_map( wr, 1 );
-  mpack_write_cstr( wr, "O" );
-  mpack_start_array( wr, 1 );
-  mpack_start_map( wr, 7 );
-  mpack_write_cstr( wr, "D" );
-  mpack_write_str( wr, ( const char* )entry->rdata, entry->rdata_len );
-  mpack_write_cstr( wr, "N" );
-  mpack_write_str( wr, ( const char* )entry->rrname, entry->rrname_len );
-  mpack_write_cstr( wr, "T" );
-  mpack_write_str( wr, ( const char* )entry->rrtype, entry->rrtype_len );
-  mpack_write_cstr( wr, "I" );
-  mpack_write_str( wr, ( const char* )entry->sensorid, entry->sensorid_len );
-  mpack_write_cstr( wr, "C" );
-  mpack_write_uint( wr, entry->count );
-  mpack_write_cstr( wr, "F" );
-  mpack_write_timestamp_seconds( wr, entry->first_seen );
-  mpack_write_cstr( wr, "L" );
-  mpack_write_timestamp_seconds( wr, entry->last_seen );
-  mpack_finish_map( wr );
-  mpack_finish_array( wr );
-  mpack_finish_map( wr );
-  mpack_error_t err = mpack_writer_error( wr );
-  if( err != mpack_ok ) {
-    L( prnl( "encoding inner msgpack data failed with error-code `%d`", err ) );
-    mpack_writer_destroy( wr );
+
+  protocol_input_request_t input = {.entry=*entry};
+  ssize_t rc = blb_protocol_encode_input_request( &input, (char*)state->scrtch1, state->scrtch1_sz );
+  if( rc <= 0 ){
+    L( prnl("unable to encode input request") );
     return ( -1 );
   }
-  size_t used_inner = mpack_writer_buffer_used( wr );
-  T( prnl( "encoded inner message size `%zu`", used_inner ) );
-  ASSERT( used_inner < state->scrtch1_sz );
-  mpack_writer_destroy( wr );
-  // encode outer message
-  mpack_writer_init( wr, ( char* )state->scrtch2, state->scrtch2_sz );
-  mpack_start_map( wr, 2 );
-  mpack_write_cstr( wr, "T" );
-  mpack_write_int( wr, 1 );
-  mpack_write_cstr( wr, "M" );
-  mpack_write_bin( wr, ( char* )state->scrtch1, used_inner );
-  mpack_finish_map( wr );
-  mpack_error_t outer_err = mpack_writer_error( wr );
-  if( outer_err != mpack_ok ) {
-    L( prnl( "encoding outer msgpack data failed with error-code `%d`", err ) );
-    mpack_writer_destroy( wr );
-    return ( -1 );
-  }
-  size_t used_outer = mpack_writer_buffer_used( wr );
-  ASSERT( used_outer < state->scrtch1_sz );
-  T( prnl( "encoded outer message size `%zu`", used_outer ) );
-  mpack_writer_destroy( wr );
-  uint8_t* p = state->scrtch2;
-  ssize_t r = used_outer;
+
+  uint8_t* p = state->scrtch1;
+  ssize_t r = rc;
   while( r > 0 ) {
     ssize_t rc = write( state->sock, p, r );
     if( rc < 0 ) {
