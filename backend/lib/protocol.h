@@ -8,17 +8,6 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
-enum {
-  OBS_RRNAME_IDX = 0,
-  OBS_RRTYPE_IDX = 1,
-  OBS_RDATA_IDX = 2,
-  OBS_SENSOR_IDX = 3,
-  OBS_COUNT_IDX = 4,
-  OBS_FIRST_SEEN_IDX = 5,
-  OBS_LAST_SEEN_IDX = 6,
-  OBS_FIELDS = 7
-};
-
 #define PROTOCOL_INPUT_REQUEST 1
 #define PROTOCOL_QUERY_REQUEST 2
 #define PROTOCOL_BACKUP_REQUEST 3
@@ -118,5 +107,13 @@ int blb_protocol_stream_decode(
     protocol_stream_t* stream, protocol_message_t* out );
 
 void blb_protocol_stream_teardown( protocol_stream_t* stream );
+
+typedef struct protocol_dump_stream_t protocol_dump_stream_t;
+protocol_dump_stream_t* blb_protocol_dump_stream_new( FILE* f );
+
+void blb_protocol_dump_stream_teardown( protocol_dump_stream_t* stream );
+
+int blb_protocol_dump_stream_decode(
+    protocol_dump_stream_t* stream, protocol_entry_t* entry );
 
 #endif

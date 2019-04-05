@@ -1,9 +1,21 @@
 // balboa
 // Copyright (c) 2018, 2019 DCSO GmbH
 
+#include <bs.h>
 #include <mpack.h>
 #include <protocol.h>
 #include <trace.h>
+
+enum {
+  OBS_RRNAME_IDX = 0,
+  OBS_RRTYPE_IDX = 1,
+  OBS_RDATA_IDX = 2,
+  OBS_SENSOR_IDX = 3,
+  OBS_COUNT_IDX = 4,
+  OBS_FIRST_SEEN_IDX = 5,
+  OBS_LAST_SEEN_IDX = 6,
+  OBS_FIELDS = 7
+};
 
 #define PROTOCOL_TYPED_MESSAGE_TYPE_KEY ( "T" )
 #define PROTOCOL_TYPED_MESSAGE_ENCODED_KEY ( "M" )
@@ -48,6 +60,11 @@ struct protocol_stream_t {
   void* usr;
   ssize_t ( *read_cb )( void* usr, char* p, size_t p_sz );
   char scrtch[PROTOCOL_SCRTCH_BUFFERS][PROTOCOL_SCRTCH_SZ];
+};
+
+struct protocol_dump_stream_t {
+  mpack_reader_t reader;
+  unsigned char scrtch[PROTOCOL_SCRTCH_SZ];
 };
 
 static ssize_t blb_protocol_encode_outer_request(
@@ -695,5 +712,90 @@ int blb_protocol_stream_decode(
     X( prnl( "got dump request" ) );
     return ( blb_protocol_decode_dump( stream, payload, out ) );
   default: L( prnl( "invalid message type" ) ); return ( -1 );
+  }
+}
+
+protocol_dump_stream_t* blb_protocol_dump_stream_new( FILE* file ) {
+  protocol_dump_stream_t* stream = blb_new( protocol_dump_stream_t );
+  if( stream == NULL ) { return ( NULL ); }
+  mpack_reader_init_stdfile( &stream->reader, file, 0 );
+  return ( stream );
+}
+
+void blb_protocol_dump_stream_treardown( protocol_dump_stream_t* stream ) {
+  mpack_reader_destroy( &stream->reader );
+  blb_free( stream );
+}
+
+int blb_protocol_dump_stream_decode(
+    protocol_dump_stream_t* stream, protocol_entry_t* entry ) {
+  mpack_reader_t* rd = &stream->reader;
+  uint32_t cnt = mpack_expect_map( rd );
+  mpack_error_t map_ok = mpack_reader_error( rd );
+  if( map_ok != mpack_ok ) {
+    if( map_ok == mpack_error_eof ) {
+      V( prnl( "dump finished; eof reached" ) );
+      return ( -1 );
+    } else {
+      L( prnl( "unexpected mpack decode error `%d`", map_ok ) );
+      return ( -2 );
+    }
+  }
+  if( cnt != OBS_FIELDS ) {
+    L( prnl(
+        "expected map with `%u` entries but got `%u` entries",
+        OBS_FIELDS,
+        cnt ) );
+    return ( -2 );
+  }
+  bytestring_sink_t sink = bs_sink( stream->scrtch, PROTOCOL_SCRTCH_SZ );
+  for( uint32_t i = 0; i < cnt; i++ ) {
+    uint32_t field = mpack_expect_uint( rd );
+    switch( field ) {
+    case OBS_RRTYPE_IDX: {
+      size_t sz = mpack_expect_bin_buf( rd, ( char* )sink.p, sink.available );
+      entry->rrtype = ( const char* )sink.p;
+      entry->rrtype_len = sz;
+      sink = bs_sink_slice0( &sink, sz );
+      if( sink.p == 0 ) { return ( -2 ); }
+      break;
+    }
+    case OBS_RDATA_IDX: {
+      size_t sz = mpack_expect_bin_buf( rd, ( char* )sink.p, sink.available );
+      entry->rdata = ( const char* )sink.p;
+      entry->rdata_len = sz;
+      sink = bs_sink_slice0( &sink, sz );
+      if( sink.p == 0 ) { return ( -2 ); }
+      break;
+    }
+    case OBS_SENSOR_IDX: {
+      size_t sz = mpack_expect_bin_buf( rd, ( char* )sink.p, sink.available );
+      entry->sensorid = ( const char* )sink.p;
+      entry->sensorid_len = sz;
+      sink = bs_sink_slice0( &sink, sz );
+      if( sink.p == 0 ) { return ( -2 ); }
+      break;
+    }
+    case OBS_RRNAME_IDX: {
+      size_t sz = mpack_expect_bin_buf( rd, ( char* )sink.p, sink.available );
+      entry->rrname = ( const char* )sink.p;
+      entry->rrname_len = sz;
+      sink = bs_sink_slice0( &sink, sz );
+      if( sink.p == 0 ) { return ( -2 ); }
+      break;
+    }
+    case OBS_COUNT_IDX: entry->count = mpack_expect_uint( rd ); break;
+    case OBS_LAST_SEEN_IDX: entry->last_seen = mpack_expect_uint( rd ); break;
+    case OBS_FIRST_SEEN_IDX: entry->first_seen = mpack_expect_uint( rd ); break;
+    default: L( prnl( "unknown field index `%u`", field ) ); return ( -1 );
+    }
+  }
+
+  mpack_done_map( rd );
+  mpack_error_t err = mpack_reader_error( rd );
+  switch( err ) {
+  case mpack_ok: return ( 0 );
+  case mpack_error_eof: return ( -1 );
+  default: return ( -2 );
   }
 }

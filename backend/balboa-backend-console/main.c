@@ -16,7 +16,6 @@
 #include <bs.h>
 #include <engine.h>
 #include <ketopt.h>
-#include <mpack.h>
 #include <protocol.h>
 #include <trace.h>
 
@@ -26,10 +25,6 @@ typedef struct state_t state_t;
 struct state_t {
   uint8_t* scrtch0;
   size_t scrtch0_sz;
-  uint8_t* scrtch1;
-  size_t scrtch1_sz;
-  uint8_t* scrtch2;
-  size_t scrtch2_sz;
   FILE* os;
   int sock;
   int ( *dump_entry_cb )( state_t* state, protocol_entry_t* entry );
@@ -39,19 +34,6 @@ static int dump_state_init( state_t* state ) {
   state->scrtch0_sz = 1024 * 1024 * 10;
   state->scrtch0 = malloc( state->scrtch0_sz );
   if( state->scrtch0 == NULL ) { return ( -1 ); }
-  state->scrtch1_sz = 1024 * 1024 * 10;
-  state->scrtch1 = malloc( state->scrtch1_sz );
-  if( state->scrtch1 == NULL ) {
-    free( state->scrtch0 );
-    return ( -1 );
-  }
-  state->scrtch2_sz = 1024 * 1024 * 10;
-  state->scrtch2 = malloc( state->scrtch2_sz );
-  if( state->scrtch2 == NULL ) {
-    free( state->scrtch0 );
-    free( state->scrtch1 );
-    return ( -1 );
-  }
   state->os = NULL;
   state->sock = -1;
   return ( 0 );
@@ -59,106 +41,29 @@ static int dump_state_init( state_t* state ) {
 
 static void dump_state_teardown( state_t* state ) {
   free( state->scrtch0 );
-  free( state->scrtch1 );
-  free( state->scrtch2 );
-}
-
-static inline int dump_entry_decode(
-    mpack_reader_t* rd, protocol_entry_t* entry, const bytestring_sink_t* in ) {
-  bytestring_sink_t sink = *in;
-  for( int i = 0; i < OBS_FIELDS; i++ ) {
-    uint32_t field = mpack_expect_uint( rd );
-    switch( field ) {
-    case OBS_RRTYPE_IDX: {
-      size_t sz = mpack_expect_bin_buf( rd, ( char* )sink.p, sink.available );
-      entry->rrtype = ( const char* )sink.p;
-      entry->rrtype_len = sz;
-      sink = bs_sink_slice0( &sink, sz );
-      if( sink.p == 0 ) { return ( -1 ); }
-      break;
-    }
-    case OBS_RDATA_IDX: {
-      size_t sz = mpack_expect_bin_buf( rd, ( char* )sink.p, sink.available );
-      entry->rdata = ( const char* )sink.p;
-      entry->rdata_len = sz;
-      sink = bs_sink_slice0( &sink, sz );
-      if( sink.p == 0 ) { return ( -1 ); }
-      break;
-    }
-    case OBS_SENSOR_IDX: {
-      size_t sz = mpack_expect_bin_buf( rd, ( char* )sink.p, sink.available );
-      entry->sensorid = ( const char* )sink.p;
-      entry->sensorid_len = sz;
-      sink = bs_sink_slice0( &sink, sz );
-      if( sink.p == 0 ) { return ( -1 ); }
-      break;
-    }
-    case OBS_RRNAME_IDX: {
-      size_t sz = mpack_expect_bin_buf( rd, ( char* )sink.p, sink.available );
-      entry->rrname = ( const char* )sink.p;
-      entry->rrname_len = sz;
-      sink = bs_sink_slice0( &sink, sz );
-      if( sink.p == 0 ) { return ( -1 ); }
-      break;
-    }
-    case OBS_COUNT_IDX: entry->count = mpack_expect_uint( rd ); break;
-    case OBS_LAST_SEEN_IDX: entry->last_seen = mpack_expect_uint( rd ); break;
-    case OBS_FIRST_SEEN_IDX: entry->first_seen = mpack_expect_uint( rd ); break;
-    default: L( prnl( "unknown field index `%u`", field ) ); return ( -1 );
-    }
-  }
-  return ( 0 );
 }
 
 static ssize_t dump_process( state_t* state, FILE* is ) {
-  bytestring_sink_t sink = bs_sink( state->scrtch0, state->scrtch0_sz );
-  mpack_reader_t __rd = {0}, *rd = &__rd;
-  mpack_reader_init_stdfile( rd, is, 0 );
+  protocol_dump_stream_t* stream = blb_protocol_dump_stream_new( is );
   ssize_t entries = 0;
-  mpack_error_t err = mpack_ok;
-  while( err == mpack_ok ) {
-    uint32_t cnt = mpack_expect_map( rd );
-    mpack_error_t map_ok = mpack_reader_error( rd );
-    if( map_ok != mpack_ok ) {
-      if( map_ok == mpack_error_eof ) {
-        V( prnl( "dump finished; eof reached" ) );
-      } else {
-        L( prnl( "unexpected mpack decode error `%d`", map_ok ) );
-      }
-      break;
-    }
-    X( prnl( "received map with `%d` entries", cnt ) );
-    if( cnt != OBS_FIELDS ) {
-      L( prnl(
-          "expected map with `%u` entries but got `%u` entries",
-          OBS_FIELDS,
-          cnt ) );
-      break;
-    }
-    protocol_entry_t __entry = {0}, *entry = &__entry;
-    int entry_ok = dump_entry_decode( rd, entry, &sink );
-    if( entry_ok != 0 ) {
-      L( prnl( "decoding entry failed" ) );
-      break;
-    }
-    mpack_done_map( rd );
-    err = mpack_reader_error( rd );
-    if( err == mpack_ok ) {
-      entries++;
-      int rc = state->dump_entry_cb( state, entry );
+  while( 1 ) {
+    protocol_entry_t entry;
+    int rc = blb_protocol_dump_stream_decode( stream, &entry );
+    switch( rc ) {
+    case 0: {
+      int rc = state->dump_entry_cb( state, &entry );
       if( rc != 0 ) {
-        L( prnl( "dump_entry_db() failed with rc `%d`", rc ) );
-        break;
+        L( prnl( "dump_entry_cb() failed with `%d`", rc ) );
+        return ( -entries );
       }
+      continue;
+    }
+    case -1: return ( entries );
+    default:
+      L( prnl( "blb_dump_stream_decode() failed" ) );
+      return ( -entries );
     }
   }
-  if( err != mpack_error_eof ) {
-    L( prnl(
-        "decode failed with error-code `%d` ( decoded `%zu` entries so far )",
-        err,
-        entries ) );
-  }
-  mpack_reader_destroy( rd );
   return ( entries );
 }
 
@@ -189,7 +94,7 @@ static int dump( state_t* state, const char* dump_file ) {
 
 static int dump_entry_json_cb( state_t* state, protocol_entry_t* entry ) {
   assert( state->os != NULL );
-  bytestring_sink_t __sink = bs_sink( state->scrtch1, state->scrtch1_sz );
+  bytestring_sink_t __sink = bs_sink( state->scrtch0, state->scrtch0_sz );
   bytestring_sink_t* sink = &__sink;
   int ok = 0;
   char buf[64] = {0};
@@ -229,14 +134,15 @@ static int dump_entry_json_cb( state_t* state, protocol_entry_t* entry ) {
 static int dump_entry_replay_cb( state_t* state, protocol_entry_t* entry ) {
   ASSERT( state->sock != -1 );
 
-  protocol_input_request_t input = {.entry=*entry};
-  ssize_t rc = blb_protocol_encode_input_request( &input, (char*)state->scrtch1, state->scrtch1_sz );
-  if( rc <= 0 ){
-    L( prnl("unable to encode input request") );
+  protocol_input_request_t input = {.entry = *entry};
+  ssize_t rc = blb_protocol_encode_input_request(
+      &input, ( char* )state->scrtch0, state->scrtch0_sz );
+  if( rc <= 0 ) {
+    L( prnl( "unable to encode input request" ) );
     return ( -1 );
   }
 
-  uint8_t* p = state->scrtch1;
+  uint8_t* p = state->scrtch0;
   ssize_t r = rc;
   while( r > 0 ) {
     ssize_t rc = write( state->sock, p, r );
