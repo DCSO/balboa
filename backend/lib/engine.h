@@ -1,3 +1,5 @@
+// balboa
+// Copyright (c) 2018, 2019 DCSO GmbH
 
 #ifndef __ENGINE_H
 #define __ENGINE_H

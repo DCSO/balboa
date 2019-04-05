@@ -1,5 +1,5 @@
-
-#ifdef __TRACE__
+// balboa
+// Copyright (c) 2018, 2019 DCSO GmbH
 
 #include <inttypes.h>
 #include <pthread.h>
@@ -79,5 +79,3 @@ void theTrace_stream_use( const trace_config_t* config ) {
   theTrace_set( theTrace_stdout );
   theTrace_init( config );
 }
-
-#endif
