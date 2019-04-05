@@ -165,7 +165,7 @@ int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
 
 int blb_thread_query_stream_push_response(
     thread_t* th, const protocol_entry_t* entry ) {
-  WHEN_T {
+  WHEN_X {
     theTrace_lock();
     prnl( "query stream push entry" );
     prnl(
