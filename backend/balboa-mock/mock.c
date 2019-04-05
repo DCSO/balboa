@@ -81,7 +81,7 @@ static int blb_mock_input( thread_t* th, const protocol_input_request_t* i ) {
   // blb_mock_t* db=(blb_mock_t*)th->db;
 
   X( prnl(
-      "put `%.*s` `%.*s` `%.*s` `%.*s` %d",
+      "put `%.*s` `%.*s` `%.*s` `%.*s` `%u` `%u` `%u`",
       ( int )i->entry.rdata_len,
       i->entry.rdata,
       ( int )i->entry.rrname_len,
@@ -90,7 +90,9 @@ static int blb_mock_input( thread_t* th, const protocol_input_request_t* i ) {
       i->entry.rrtype,
       ( int )i->entry.sensorid_len,
       i->entry.sensorid,
-      i->entry.count ) );
+      i->entry.count,
+      i->entry.first_seen,
+      i->entry.last_seen) );
 
   return ( 0 );
 }

@@ -320,7 +320,7 @@ static void* blb_engine_thread_fn( void* usr ) {
     }
     int rc = blb_protocol_stream_decode( stream, &msg );
     if( rc != 0 ) {
-      L( prnl( "protocol_stream_decode() failed" ) );
+      L( prnl( "blb_protocol_stream_decode() failed" ) );
       goto thread_exit;
     }
     int th_rc = blb_engine_thread_consume( th, &msg );

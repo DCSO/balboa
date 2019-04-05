@@ -90,7 +90,7 @@ struct protocol_entry_t {
   size_t rrtype_len;
   const char* sensorid;
   size_t sensorid_len;
-  int count;
+  uint32_t count;
   uint32_t first_seen;
   uint32_t last_seen;
 };

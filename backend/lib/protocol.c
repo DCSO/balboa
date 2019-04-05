@@ -141,11 +141,11 @@ ssize_t blb_protocol_encode_entry(
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_COUNT_KEY );
   mpack_write_uint( wr, entry->count );
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY );
-  // mpack_write_timestamp_seconds(wr,entry->first_seen);
-  mpack_write_uint( wr, entry->first_seen );
+  mpack_write_timestamp_seconds(wr,entry->first_seen);
+  // mpack_write_uint( wr, entry->first_seen );
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY );
-  // mpack_write_timestamp_seconds(wr,entry->last_seen);
-  mpack_write_uint( wr, entry->last_seen );
+  mpack_write_timestamp_seconds(wr,entry->last_seen);
+  // mpack_write_uint( wr, entry->last_seen );
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RDATA_KEY );
   mpack_write_str( wr, entry->rdata, entry->rdata_len );
   mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RRNAME_KEY );
@@ -178,7 +178,7 @@ ssize_t blb_protocol_encode_input_request(
     return ( -1 );
   }
   return ( blb_protocol_encode_outer_request(
-      PROTOCOL_BACKUP_REQUEST, p, p_sz, used_inner ) );
+      PROTOCOL_INPUT_REQUEST, p, p_sz, used_inner ) );
 }
 
 ssize_t blb_protocol_encode_stream_start_response( char* p, size_t p_sz ) {
@@ -297,7 +297,7 @@ static int blb_protocol_decode_input(
   uint32_t cnt = mpack_expect_map( rd );
   mpack_error_t map_ok = mpack_reader_error( rd );
   if( cnt != 7 || map_ok != mpack_ok ) {
-    L( prnl( "invalid inner message: map with 7 elements expected" ) );
+    L( prnl( "invalid inner message: map with 7 elements expected got `%u`", cnt ) );
     goto decode_error;
   }
 
@@ -312,7 +312,7 @@ static int blb_protocol_decode_input(
     switch( key[0] ) {
     case PROTOCOL_PDNS_ENTRY_COUNT_KEY0: {
       X( prnl( "got input request count" ) );
-      i->entry.count = mpack_expect_int( rd );
+      i->entry.count = mpack_expect_uint( rd );
       break;
     }
     case PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY0: {
@@ -394,9 +394,9 @@ static int blb_protocol_decode_query(
   WHEN_X {
     theTrace_lock();
     for( size_t i = 0; i < p_sz; i++ ) {
-      out( "%02x ", ( int )( unsigned char )p[i] );
+      printf( "%02x ", ( int )( unsigned char )p[i] );
     }
-    out( "\n" );
+    printf( "\n" );
     theTrace_release();
   }
 
@@ -514,9 +514,9 @@ static int blb_protocol_decode_backup(
   WHEN_X {
     theTrace_lock();
     for( size_t i = 0; i < p_sz; i++ ) {
-      out( "%02x ", ( int )( unsigned char )p[i] );
+      printf( "%02x ", ( int )( unsigned char )p[i] );
     }
-    out( "\n" );
+    printf( "\n" );
     theTrace_release();
   }
 
@@ -571,9 +571,9 @@ static int blb_protocol_decode_dump(
   WHEN_X {
     theTrace_lock();
     for( size_t i = 0; i < p_sz; i++ ) {
-      out( "%02x ", ( int )( unsigned char )p[i] );
+      printf( "%02x ", ( int )( unsigned char )p[i] );
     }
-    out( "\n" );
+    printf( "\n" );
     theTrace_release();
   }
 
