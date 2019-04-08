@@ -181,13 +181,13 @@ const (
 		stats(): Stats
 	}
 
-	type Mutation {
-		announceObservation(observation: EntryInput!): Entry!
-	}
+	#type Mutation {
+	#	announceObservation(observation: EntryInput!): Entry!
+	#}
 
 	schema {
 		query: Query
-		mutation: Mutation
+		#mutation: Mutation
 	}`
 )
 
@@ -257,31 +257,31 @@ func (r *Resolver) Entries(args struct {
 
 // AnnounceObservation is a mutation that adds a single new observation
 // to the database.
-func (r *Resolver) AnnounceObservation(args struct {
-	Observation struct {
-		Count     int32
-		TimeFirst int32
-		TimeLast  int32
-		RRType    string
-		RRName    string
-		RData     string
-		SensorID  string
-	}
-}) *EntryResolver {
-	inObs := observation.InputObservation{
-		Count:          int(args.Observation.Count),
-		TimestampStart: time.Unix(int64(args.Observation.TimeFirst), 0),
-		TimestampEnd:   time.Unix(int64(args.Observation.TimeLast), 0),
-		Rrname:         args.Observation.RRName,
-		Rrtype:         args.Observation.RRType,
-		Rdata:          args.Observation.RData,
-		SensorID:       args.Observation.SensorID,
-	}
-	resObs := db.ObservationDB.AddObservation(inObs)
-	return &EntryResolver{
-		entry: resObs,
-	}
-}
+//func (r *Resolver) AnnounceObservation(args struct {
+//	Observation struct {
+//		Count     int32
+//		TimeFirst int32
+//		TimeLast  int32
+//		RRType    string
+//		RRName    string
+//		RData     string
+//		SensorID  string
+//	}
+//}) *EntryResolver {
+//	inObs := observation.InputObservation{
+//		Count:          int(args.Observation.Count),
+//		TimestampStart: time.Unix(int64(args.Observation.TimeFirst), 0),
+//		TimestampEnd:   time.Unix(int64(args.Observation.TimeLast), 0),
+//		Rrname:         args.Observation.RRName,
+//		Rrtype:         args.Observation.RRType,
+//		Rdata:          args.Observation.RData,
+//		SensorID:       args.Observation.SensorID,
+//	}
+//	resObs := db.ObservationDB.AddObservation(inObs)
+//	return &EntryResolver{
+//		entry: resObs,
+//	}
+//}
 
 // Stats returns a Stats resolver.
 func (r *Resolver) Stats() (*StatsResolver, error) {

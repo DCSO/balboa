@@ -19,102 +19,6 @@ type RemoteBackend struct {
 	StopChan chan bool
 }
 
-type TypedMessage struct {
-	Type           uint8  `codec:"T"`
-	EncodedMessage []byte `codec:"M"`
-}
-
-type QueryMessage struct {
-	Qrdata, Qrrname, Qrrtype, QsensorID string
-	Hrdata, Hrrname, Hrrtype, HsensorID bool
-	Limit                               int
-}
-
-type InputMessage struct {
-	Obs []obs.InputObservation `codec:"O"`
-}
-
-type QueryResponse struct {
-	Obs []obs.Observation `codec:"O"`
-}
-
-type ErrorResponse struct {
-	Message string
-}
-
-const (
-	TypeInputMessage             = 1
-	TypeQueryMessage             = 2
-	TypeErrorResponse            = 128
-	TypeQueryResponse            = 129
-	TypeQueryStreamStartResponse = 130
-	TypeQueryStreamDataResponse  = 131
-	TypeQureyStreamEndResponse   = 132
-)
-
-func (enc *Encoder) encode_observation_message(o obs.InputObservation) (*bytes.Buffer, error) {
-	enc.inner.Reset()
-	enc.outer.Reset()
-	enc.enc.Reset(enc.inner)
-	inner_err := enc.enc.Encode(InputMessage{Obs: []obs.InputObservation{o}})
-	if inner_err != nil {
-		return nil, inner_err
-	}
-	enc.enc.Reset(enc.outer)
-	outer_err := enc.enc.Encode(&TypedMessage{Type: TypeInputMessage, EncodedMessage: enc.inner.Bytes()})
-	if outer_err != nil {
-		return nil, outer_err
-	}
-	return enc.outer, nil
-}
-
-func (enc *Encoder) encode_query_message(qry QueryMessage) (*bytes.Buffer, error) {
-	enc.inner.Reset()
-	enc.outer.Reset()
-	enc.enc.Reset(enc.inner)
-	inner_err := enc.enc.Encode(qry)
-	if inner_err != nil {
-		return nil, inner_err
-	}
-	enc.enc.Reset(enc.outer)
-	outer_err := enc.enc.Encode(&TypedMessage{Type: TypeQueryMessage, EncodedMessage: enc.inner.Bytes()})
-	if outer_err != nil {
-		return nil, outer_err
-	}
-	return enc.outer, nil
-}
-
-func (enc *Encoder) Encode_error_response(err ErrorResponse) (*bytes.Buffer, error) {
-	enc.inner.Reset()
-	enc.outer.Reset()
-	inner_err := enc.enc.Encode(err)
-	if inner_err != nil {
-		return nil, inner_err
-	}
-	enc.enc.Reset(enc.outer)
-	outer_err := enc.enc.Encode(&TypedMessage{Type: TypeQueryMessage, EncodedMessage: enc.inner.Bytes()})
-	if outer_err != nil {
-		return nil, outer_err
-	}
-	return enc.outer, nil
-}
-
-func (enc *Encoder) Encode_query_response(rep QueryResponse) (*bytes.Buffer, error) {
-	enc.inner.Reset()
-	enc.outer.Reset()
-	enc.enc.Reset(enc.inner)
-	inner_err := enc.enc.Encode(rep)
-	if inner_err != nil {
-		return nil, inner_err
-	}
-	enc.enc.Reset(enc.outer)
-	outer_err := enc.enc.Encode(&TypedMessage{Type: TypeQueryResponse, EncodedMessage: enc.inner.Bytes()})
-	if outer_err != nil {
-		return nil, outer_err
-	}
-	return enc.outer, nil
-}
-
 func MakeRemoteBackend(host string, refill bool) (*RemoteBackend, error) {
 	return &RemoteBackend{StopChan: make(chan bool), host: host}, nil
 }
@@ -122,16 +26,6 @@ func MakeRemoteBackend(host string, refill bool) (*RemoteBackend, error) {
 func (db *RemoteBackend) AddObservation(o obs.InputObservation) obs.Observation {
 	log.Warn("AddObservation() not implemented")
 	return obs.Observation{}
-}
-
-type Encoder struct {
-	inner *bytes.Buffer
-	outer *bytes.Buffer
-	enc   *codec.Encoder
-}
-
-func (enc *Encoder) Release() {
-	enc.enc.Release()
 }
 
 func MakeEncoder() *Encoder {
@@ -142,42 +36,6 @@ func MakeEncoder() *Encoder {
 	h.WriteExt = true
 	enc := codec.NewEncoder(inner, h)
 	return &Encoder{inner: inner, outer: outer, enc: enc}
-}
-
-type Decoder struct {
-	conn      net.Conn
-	outer_dec *codec.Decoder
-	inner_dec *codec.Decoder
-}
-
-func (dec *Decoder) Expect_typed_message() (*TypedMessage, error) {
-	//dec.outer_dec.Reset(dec.conn)
-	var msg TypedMessage
-	err := dec.outer_dec.Decode(&msg)
-	if err != nil {
-		return nil, err
-	}
-	return &msg, nil
-}
-
-func (dec *Decoder) Expect_query_message1(buf []byte) (*QueryMessage, error) {
-	dec.inner_dec.Reset(bytes.NewBuffer(buf))
-	var msg QueryMessage
-	err := dec.inner_dec.Decode(&msg)
-	if err != nil {
-		return nil, err
-	}
-	return &msg, nil
-}
-
-func (dec *Decoder) Expect_input_message1(buf []byte) (*InputMessage, error) {
-	dec.inner_dec.Reset(bytes.NewBuffer(buf))
-	var msg InputMessage
-	err := dec.inner_dec.Decode(&msg)
-	if err != nil {
-		return nil, err
-	}
-	return &msg, nil
 }
 
 func MakeDecoder(conn net.Conn) *Decoder {
@@ -197,64 +55,12 @@ func (dec *Decoder) Release() {
 	dec.outer_dec.Release()
 }
 
-func (dec *Decoder) expect_query_stream_response() (*QueryResponse, error) {
-	var res []obs.Observation
-	for {
-		msg, msg_err := dec.Expect_typed_message()
-		if msg_err != nil {
-			return nil, msg_err
-		}
-		dec.inner_dec.Reset(bytes.NewBuffer(msg.EncodedMessage))
-		if msg.Type == TypeErrorResponse {
-			var rep ErrorResponse
-			inner_err := dec.inner_dec.Decode(&rep)
-			if inner_err != nil {
-				log.Warnf("got error response during stream data; discarding stream data")
-				return nil, inner_err
-			}
-			return nil, errors.New(rep.Message)
-		}
-		if msg.Type == TypeQueryStreamDataResponse {
-			var rep obs.Observation
-			inner_err := dec.inner_dec.Decode(&rep)
-			if inner_err != nil {
-				log.Warnf("decoding stream data response failed")
-				return nil, inner_err
-			}
-			res=append(res,rep)
-		} else if msg.Type == TypeQureyStreamEndResponse {
-			return &QueryResponse{Obs:res},nil
-		}
-	}
+func (db *RemoteBackend) Backup(path string) {
+	log.Warnf("backup request unimplemented")
 }
 
-func (dec *Decoder) expect_query_response() (*QueryResponse, error) {
-	msg, msg_err := dec.Expect_typed_message()
-	if msg_err != nil {
-		return nil, msg_err
-	}
-	dec.inner_dec.Reset(bytes.NewBuffer(msg.EncodedMessage))
-	if msg.Type == TypeErrorResponse {
-		var rep ErrorResponse
-		inner_err := dec.inner_dec.Decode(&rep)
-		if inner_err != nil {
-			return nil, inner_err
-		}
-		return nil, errors.New(rep.Message)
-	}
-	if msg.Type == TypeQueryResponse {
-		var rep QueryResponse
-		inner_err := dec.inner_dec.Decode(&rep)
-		if inner_err != nil {
-			return nil, inner_err
-		}
-		return &rep, nil
-	} else if msg.Type == TypeQueryStreamStartResponse {
-		log.Debugf("got stream start response")
-		return dec.expect_query_stream_response()
-	} else {
-		return nil, errors.New("invalid query response")
-	}
+func (db *RemoteBackend) Dump(path string) {
+	log.Warnf("dump interface unimplemented")
 }
 
 func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
@@ -273,7 +79,7 @@ func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
 			return
 		case obs := <-inChan:
 			log.Debug("received observation")
-			w, err := enc.encode_observation_message(obs)
+			w, err := enc.Encode_observation_message(obs)
 			if err != nil {
 				log.Warnf("encoding observation failed: %s", err)
 				continue
@@ -288,7 +94,6 @@ func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
 				log.Warnf("short write")
 				return
 			}
-			//log.Warnf("sent %v bytes",n)
 		}
 	}
 }
@@ -324,7 +129,7 @@ func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string, lim
 	enc := MakeEncoder()
 	defer enc.Release()
 
-	w, enc_err := enc.encode_query_message(qry)
+	w, enc_err := enc.Encode_query_message(qry)
 	if enc_err != nil {
 		log.Warnf("unable to encode query")
 		return []obs.Observation{}, enc_err
@@ -350,7 +155,7 @@ func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string, lim
 	dec := MakeDecoder(conn)
 	defer dec.Release()
 
-	result, err := dec.expect_query_response()
+	result, err := dec.Expect_query_response()
 
 	log.Debugf("received answer")
 

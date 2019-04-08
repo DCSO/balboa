@@ -10,8 +10,10 @@ var ObservationDB DB
 
 // DB abstracts a database backend for observation storage.
 type DB interface {
-	AddObservation(observation.InputObservation) observation.Observation
+	//AddObservation(observation.InputObservation) observation.Observation
 	ConsumeFeed(chan observation.InputObservation)
+	Backup(path string)
+	Dump(path string)
 	Shutdown()
 	TotalCount() (int, error)
 	Search(*string, *string, *string, *string, int) ([]observation.Observation, error)

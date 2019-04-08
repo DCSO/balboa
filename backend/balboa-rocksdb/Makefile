@@ -27,7 +27,7 @@ CFLAGS+=-I. -I../lib
 CFLAGS+=-DMPACK_HAS_CONFIG
 
 LDFLAGS?=
-LDFLAGS+=-pthread -lrocksdb
+LDFLAGS+=-lrocksdb -pthread
 
 MAKEFLAGS+=--no-print-directory
 
