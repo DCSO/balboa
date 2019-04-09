@@ -247,41 +247,14 @@ ssize_t blb_protocol_encode_stream_end_response( char* p, size_t p_sz ) {
 
 ssize_t blb_protocol_encode_stream_entry(
     const protocol_entry_t* entry, char* p, size_t p_sz ) {
-  mpack_writer_t __wr = {0}, *wr = &__wr;
-  mpack_writer_init( wr, p, p_sz );
 
-  mpack_start_map( wr, 7 );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_COUNT_KEY );
-  mpack_write_uint( wr, entry->count );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_FIRSTSEEN_KEY );
-  // mpack_write_timestamp_seconds(wr,entry->first_seen);
-  mpack_write_uint( wr, entry->first_seen );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_LASTSEEN_KEY );
-  // mpack_write_timestamp_seconds(wr,entry->last_seen);
-  mpack_write_uint( wr, entry->last_seen );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RDATA_KEY );
-  mpack_write_str( wr, entry->rdata, entry->rdata_len );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RRNAME_KEY );
-  mpack_write_str( wr, entry->rrname, entry->rrname_len );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_RRTYPE_KEY );
-  mpack_write_str( wr, entry->rrtype, entry->rrtype_len );
-  mpack_write_cstr( wr, PROTOCOL_PDNS_ENTRY_SENSORID_KEY );
-  mpack_write_str( wr, entry->sensorid, entry->sensorid_len );
-  mpack_finish_map( wr );
-
-  size_t used_inner = mpack_writer_buffer_used( wr );
-
-  mpack_error_t err = mpack_writer_error( wr );
-  if( err != mpack_ok ) {
-    L( prnl( "encoding stream entry failed with mpack_error_t `%d`", err ) );
-    mpack_writer_destroy( wr );
+  ssize_t rc = blb_protocol_encode_entry( entry, p, p_sz );
+  if( rc <= 0 ){
     return ( -1 );
   }
 
-  mpack_writer_destroy( wr );
-
   return ( blb_protocol_encode_outer_request(
-      PROTOCOL_BACKUP_REQUEST, p, p_sz, used_inner ) );
+      PROTOCOL_QUERY_STREAM_DATA_RESPONSE, p, p_sz, rc ) );
 }
 
 // read-from-stream api

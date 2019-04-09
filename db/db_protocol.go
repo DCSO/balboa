@@ -45,12 +45,8 @@ type QueryRequest struct {
 	Limit                               int
 }
 
-type InputRequest struct {
-	Obs obs.InputObservation `codec:"O"`
-}
-
 type QueryResponse struct {
-	Obs []obs.Observation `codec:"O"`
+	Obs []obs.Observation
 }
 
 type ErrorResponse struct {
@@ -106,7 +102,7 @@ func (enc *Encoder) EncodeInputRequest(o obs.InputObservation) (*bytes.Buffer, e
 	enc.inner.Reset()
 	enc.outer.Reset()
 	enc.enc.Reset(enc.inner)
-	inner_err := enc.enc.Encode(InputRequest{Obs: o})
+	inner_err := enc.enc.Encode(o)
 	if inner_err != nil {
 		return nil, inner_err
 	}
@@ -174,9 +170,9 @@ func (enc *Encoder) EncodeQueryStreamDataResponse(entry obs.Observation) (*bytes
 	return enc.outer, nil
 }
 
-func (dec *Decoder) ExpectInputRequestFromBytes(buf []byte) (*InputRequest, error) {
+func (dec *Decoder) ExpectInputRequestFromBytes(buf []byte) (*obs.InputObservation, error) {
 	dec.inner_dec.Reset(bytes.NewBuffer(buf))
-	var msg InputRequest
+	var msg obs.InputObservation
 	err := dec.inner_dec.Decode(&msg)
 	if err != nil {
 		return nil, err
@@ -254,8 +250,7 @@ func (dec *Decoder) ExpectQueryStreamResponse() (*QueryResponse, error) {
 				return nil, inner_err
 			}
 			return nil, errors.New(rep.Message)
-		}
-		if msg.Type == TypeQueryStreamDataResponse {
+		} else if msg.Type == TypeQueryStreamDataResponse {
 			var rep obs.Observation
 			inner_err := dec.inner_dec.Decode(&rep)
 			if inner_err != nil {
@@ -265,6 +260,9 @@ func (dec *Decoder) ExpectQueryStreamResponse() (*QueryResponse, error) {
 			res = append(res, rep)
 		} else if msg.Type == TypeQueryStreamEndResponse {
 			return &QueryResponse{Obs: res}, nil
+		} else {
+			log.Warnf("invalid message type `%v`", msg.Type)
+			return nil, errors.New("received invalid message type from backend")
 		}
 	}
 }

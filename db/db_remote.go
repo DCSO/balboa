@@ -160,6 +160,7 @@ func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string, lim
 	log.Debugf("received answer")
 
 	if err != nil {
+		log.Warnf("ExpectQueryResponse() failed with `%v`", err)
 		conn.Close()
 		return []obs.Observation{}, err
 	}

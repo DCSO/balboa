@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/DCSO/balboa/db"
+	obs "github.com/DCSO/balboa/observation"
 
 	log "github.com/sirupsen/logrus"
 )
 
 type Handler interface {
-	HandleObservations(*db.InputRequest)
+	HandleObservations(*obs.InputObservation)
 	HandleQuery(*db.QueryRequest, net.Conn)
 	HandleDump(*db.DumpRequest, net.Conn)
 	HandleBackup(*db.BackupRequest)
