@@ -60,7 +60,7 @@ func (db *RemoteBackend) Backup(path string) {
 }
 
 func (db *RemoteBackend) Dump(path string) {
-	log.Warnf("dump interface unimplemented")
+	log.Warnf("dump request unimplemented")
 }
 
 func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
