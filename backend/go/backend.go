@@ -42,7 +42,7 @@ func handle(conn net.Conn, h Handler, stopCh chan bool, wg *sync.WaitGroup) {
 		default:
 			msg, err := dec.ExpectTypedMessage()
 			if err != nil {
-				log.Warnf("unable to decode typed message: %v", err)
+				log.Warnf("unable to decode typed message `%v`", err)
 				return
 			}
 			switch msg.Type {
@@ -79,7 +79,7 @@ func handle(conn net.Conn, h Handler, stopCh chan bool, wg *sync.WaitGroup) {
 				}
 				h.HandleDump(inner, conn)
 			default:
-				log.Warnf("invalid or unsupported message type=%v", msg.Type)
+				log.Warnf("invalid or unsupported message type `%v`", msg.Type)
 				return
 			}
 		}
