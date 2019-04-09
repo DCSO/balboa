@@ -107,7 +107,7 @@ func loop(host string, h Handler, stopCh chan bool, wg *sync.WaitGroup) {
 					log.Debugf("accepting client connection timeout")
 					continue
 				}
-				log.Warnf("unable to accept new client connection: %s", err)
+				log.Warnf("unable to accept new client connection `%s`", err)
 				continue
 			}
 			log.Debugf("handling new connection")
