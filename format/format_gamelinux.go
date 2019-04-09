@@ -51,7 +51,7 @@ func MakeFjellskaalInputObservations(inputJSON []byte, sensorID string, out chan
 					continue
 				}
 				o := observation.InputObservation{
-					Count:          count,
+					Count:          uint(count),
 					Rdata:          strings.TrimRight(rdata, "."),
 					Rrname:         strings.TrimRight(rrname, "."),
 					Rrtype:         rrtype,

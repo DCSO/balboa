@@ -4,9 +4,9 @@
 #ifndef __PROTOCOL_H
 #define __PROTOCOL_H
 
-#include <alloc.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define PROTOCOL_INPUT_REQUEST 1
 #define PROTOCOL_QUERY_REQUEST 2

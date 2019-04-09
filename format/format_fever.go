@@ -14,7 +14,7 @@ import (
 
 type rdata struct {
 	AnsweringHost string `json:"answering_host"`
-	Count         int    `json:"count"`
+	Count         uint    `json:"count"`
 	Rcode         string `json:"rcode"`
 	Rdata         string `json:"rdata"`
 	Rrtype        string `json:"rrtype"`

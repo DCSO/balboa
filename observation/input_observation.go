@@ -10,7 +10,7 @@ import (
 // InputObservation is a minimal, small observation structure to be used as
 // the minimal common input type for all consumers.
 type InputObservation struct {
-	Count int `codec:"C"`
+	Count uint `codec:"C"`
 	Rcode string `codec:"-"`
 	Rdata string `codec:"D"`
 	Rrtype string `codec:"T"`

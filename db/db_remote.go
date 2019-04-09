@@ -79,7 +79,7 @@ func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
 			return
 		case obs := <-inChan:
 			log.Debug("received observation")
-			w, err := enc.Encode_observation_message(obs)
+			w, err := enc.EncodeInputRequest(obs)
 			if err != nil {
 				log.Warnf("encoding observation failed: %s", err)
 				continue
@@ -107,7 +107,7 @@ func sanitize(s *string) string {
 }
 
 func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string, limit int) ([]obs.Observation, error) {
-	qry := QueryMessage{
+	qry := QueryRequest{
 		Qrdata:    sanitize(qrdata),
 		Hrdata:    qrdata != nil,
 		Qrrname:   sanitize(qrrname),
@@ -129,7 +129,7 @@ func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string, lim
 	enc := MakeEncoder()
 	defer enc.Release()
 
-	w, enc_err := enc.Encode_query_message(qry)
+	w, enc_err := enc.EncodeQueryRequest(qry)
 	if enc_err != nil {
 		log.Warnf("unable to encode query")
 		return []obs.Observation{}, enc_err
@@ -155,7 +155,7 @@ func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string, lim
 	dec := MakeDecoder(conn)
 	defer dec.Release()
 
-	result, err := dec.Expect_query_response()
+	result, err := dec.ExpectQueryResponse()
 
 	log.Debugf("received answer")
 
