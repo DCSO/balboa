@@ -494,8 +494,9 @@ static int blb_rocksdb_query_by_i(
     toks[RDATA].tok = key + 2;
     toks[RDATA].tok_len = toks[RDATA].tok_len + last - 1;
 
+    X( out( "k `%zu` `%.*s`\n", key_len, ( int )key_len, key ) );
     X(
-        out( "i %.*s | %.*s %.*s %.*s\n",
+        out( "i `%.*s` | `%.*s` `%.*s` `%.*s`\n",
              toks[RDATA].tok_len,
              toks[RDATA].tok,
              toks[SENSORID].tok_len,
