@@ -5,8 +5,8 @@
 #define __PROTOCOL_H
 
 #include <inttypes.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define PROTOCOL_INPUT_REQUEST 1
 #define PROTOCOL_QUERY_REQUEST 2

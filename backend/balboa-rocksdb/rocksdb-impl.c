@@ -506,6 +506,11 @@ static int blb_rocksdb_query_by_i(
              toks[RRNAME].tok_len,
              toks[RRNAME].tok ) );
 
+    if( j < FIELDS ){
+      L( prnl( "found invalid key `%.*s`; skipping ...", (int)key_len, key) );
+      continue;
+    }
+
     size_t qrdata_len = q->qrdata_len;
     if( toks[RDATA].tok_len <= 0
         || memcmp(

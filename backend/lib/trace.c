@@ -32,9 +32,8 @@ static void trace_release( trace_t* trace ) {
   pthread_mutex_unlock( &trace->_lock );
 }
 
-static void trace_output(
+static void trace_output_rfc5424(
     trace_t* trace, int priority, const char* fmt, va_list ap ) {
-  ( void )trace;
   time_t now;
   time( &now );
   struct tm tm;
@@ -44,14 +43,31 @@ static void trace_output(
   fprintf(
       trace->config.stream,
       "<%d>1 %.*s %s %s %d - - ",
-      priority,
+      16 * 8 + priority,
       ( int )len,
       b,
       trace->config.host,
       trace->config.app,
-      trace->config.procid
+      trace->config.procid );
+  vfprintf( trace->config.stream, fmt, ap );
+}
 
-  );
+static void trace_output_systemd(
+    trace_t* trace, int priority, const char* fmt, va_list ap ) {
+  fprintf( trace->config.stream, "<%d> ", priority );
+  vfprintf( trace->config.stream, fmt, ap );
+}
+
+static void trace_output(
+    trace_t* trace, int priority, const char* fmt, va_list ap ) {
+  if( trace->config.rfc5424 ) {
+    trace_output_rfc5424( trace, priority, fmt, ap );
+  } else {
+    trace_output_systemd( trace, priority, fmt, ap );
+  }
+}
+
+static void trace_inject( trace_t* trace, const char* fmt, va_list ap ) {
   vfprintf( trace->config.stream, fmt, ap );
 }
 
@@ -71,6 +87,7 @@ static trace_t __theTrace_stdout = {.verbosity = ATOMIC_VAR_INIT( 0 ),
                                     .init = trace_init,
                                     .lock = trace_lock,
                                     .output = trace_output,
+                                    .inject = trace_inject,
                                     .flush = trace_flush};
 
 static trace_t* const theTrace_stdout = &__theTrace_stdout;

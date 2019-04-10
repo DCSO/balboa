@@ -247,11 +247,8 @@ ssize_t blb_protocol_encode_stream_end_response( char* p, size_t p_sz ) {
 
 ssize_t blb_protocol_encode_stream_entry(
     const protocol_entry_t* entry, char* p, size_t p_sz ) {
-
   ssize_t rc = blb_protocol_encode_entry( entry, p, p_sz );
-  if( rc <= 0 ){
-    return ( -1 );
-  }
+  if( rc <= 0 ) { return ( -1 ); }
 
   return ( blb_protocol_encode_outer_request(
       PROTOCOL_QUERY_STREAM_DATA_RESPONSE, p, p_sz, rc ) );

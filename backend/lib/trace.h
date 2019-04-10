@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -40,12 +41,12 @@
   } while( 0 )
 
 #define prnl( fmt, ... ) \
-  theTrace_output( 16 * 8 + 6, "(%s) " fmt "\n", __func__, ##__VA_ARGS__ )
-#define out( fmt, ... ) theTrace_output( 16 * 8 + 7, fmt, ##__VA_ARGS__ )
-#define panic( fmt, ... )                                                     \
-  do {                                                                        \
-    theTrace_output( 16 * 8 + 0, "(%s) " fmt "\n", __func__, ##__VA_ARGS__ ); \
-    exit( 0 );                                                                \
+  theTrace_output( 6, "(%s) " fmt "\n", __func__, ##__VA_ARGS__ )
+#define out( fmt, ... ) theTrace_output( 7, fmt, ##__VA_ARGS__ )
+#define panic( fmt, ... )                                            \
+  do {                                                               \
+    theTrace_output( 0, "(%s) " fmt "\n", __func__, ##__VA_ARGS__ ); \
+    exit( 0 );                                                       \
   } while( 0 )
 
 #define WHEN_V if( theTrace_get_verbosity() > 0 )
@@ -72,6 +73,7 @@ struct trace_config_t {
   const char* host;
   const char* app;
   pid_t procid;
+  bool rfc5424;
 };
 
 typedef struct trace_t trace_t;
@@ -83,6 +85,7 @@ struct trace_t {
   void ( *lock )( trace_t* trace );
   void ( *release )( trace_t* trace );
   void ( *output )( trace_t* trace, int priority, const char* fmt, va_list ap );
+  void ( *inject )( trace_t* trace, const char* fmt, va_list ap );
   void ( *flush )( trace_t* trace );
 };
 
@@ -95,6 +98,14 @@ __attribute__( ( format( printf, 2, 3 ) ) ) static inline void theTrace_output(
   va_list ap;
   va_start( ap, fmt );
   theTrace_get()->output( theTrace_get(), priority, fmt, ap );
+  va_end( ap );
+}
+
+__attribute__( ( format( printf, 1, 2 ) ) ) static inline void theTrace_inject(
+    const char* fmt, ... ) {
+  va_list ap;
+  va_start( ap, fmt );
+  theTrace_get()->inject( theTrace_get(), fmt, ap );
   va_end( ap );
 }
 
