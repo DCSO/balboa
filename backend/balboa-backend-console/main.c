@@ -281,10 +281,7 @@ static int main_dump( int argc, char** argv ) {
   theTrace_set_verbosity( verbosity );
 
   V( log_info(
-      "host `%s` port `%s` dump_path_hint `%s`",
-      host,
-      port,
-      dump_path_hint ) );
+      "host `%s` port `%s` dump_path_hint `%s`", host, port, dump_path_hint ) );
   int sock = dump_connect( host, port );
   if( sock < 0 ) {
     L( log_error( "unable to connect to backend" ) );

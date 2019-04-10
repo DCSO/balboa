@@ -183,7 +183,8 @@ int blb_thread_query_stream_end_response( thread_t* th ) {
     return ( -1 );
   }
 
-  X( log_debug( "blb_protocol_encode_stream_end_response() returned `%zd`", used ) );
+  X( log_debug(
+      "blb_protocol_encode_stream_end_response() returned `%zd`", used ) );
 
   return ( blb_thread_write_all( th, th->scrtch_response, used ) );
 }
@@ -270,7 +271,9 @@ static inline int blb_engine_thread_consume(
     return ( blb_engine_thread_consume_dump( th, &msg->u.dump ) );
   case PROTOCOL_QUERY_REQUEST:
     return ( blb_engine_thread_consume_query( th, &msg->u.query ) );
-  default: L( log_debug( "invalid message type `%d`", msg->ty ) ); return ( -1 );
+  default:
+    L( log_debug( "invalid message type `%d`", msg->ty ) );
+    return ( -1 );
   }
 }
 
@@ -462,7 +465,8 @@ teardown:
   pthread_attr_destroy( &__attr );
 
   while( blb_thread_cnt_get() > 0 ) {
-    L( log_warn( "waiting for `%d` thread(s) to finish", blb_thread_cnt_get() ) );
+    L( log_warn(
+        "waiting for `%d` thread(s) to finish", blb_thread_cnt_get() ) );
     sleep( 2 );
   }
 

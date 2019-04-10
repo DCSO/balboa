@@ -22,16 +22,16 @@ CFLAGS+=-I. -I../lib -I$(SQLITE)
 CFLAGS+=-DMPACK_HAS_CONFIG
 
 LDFLAGS?=
-LDFLAGS+=-pthread -ldl
+LDFLAGS+=-ldl -pthread
 
 MAKEFLAGS+=--no-print-directory
 
 CC=$(CROSS_PREFIX)$(CCOMPILER)
 
-hdr-sqlite=engine.h trace.h daemon.h
+hdr-sqlite=protocol.h engine.h trace.h daemon.h
 hdr-sqlite-y=$(addprefix ../lib/,$(hdr-sqlite)) $(SQLITE)/sqlite3.h sqlite-impl.h
 
-src-sqlite=trace.c daemon.c mpack.c engine.c
+src-sqlite=trace.c daemon.c mpack.c protocol.c engine.c
 src-sqlite-y=$(addprefix ../lib/,$(src-sqlite)) $(SQLITE)/sqlite3.c
 src-sqlite-y+=sqlite-impl.c main.c
 
