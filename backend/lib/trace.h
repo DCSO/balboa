@@ -1,3 +1,5 @@
+// balboa
+// Copyright (c) 2019 DCSO GmbH
 
 #ifndef __TRACE_H
 #define __TRACE_H
