@@ -8,20 +8,20 @@
 #include <rocksdb-impl.h>
 #include <rocksdb/c.h>
 
-#define ROCKSDB_THREAD_SCRTCH_SZ ( 1024 * 10 )
+#define ROCKSDB_CONN_SCRTCH_SZ ( 1024 * 10 )
 
 static void blb_rocksdb_teardown( db_t* _db );
-static db_t* blb_rocksdb_thread_init( thread_t* th, db_t* db );
-static void blb_rocksdb_thread_deinit( thread_t* th, db_t* db );
-static int blb_rocksdb_query( thread_t* th, const protocol_query_request_t* q );
-static int blb_rocksdb_input( thread_t* th, const protocol_input_request_t* i );
+static db_t* blb_rocksdb_conn_init( conn_t* th, db_t* db );
+static void blb_rocksdb_conn_deinit( conn_t* th, db_t* db );
+static int blb_rocksdb_query( conn_t* th, const protocol_query_request_t* q );
+static int blb_rocksdb_input( conn_t* th, const protocol_input_request_t* i );
 static void blb_rocksdb_backup(
-    thread_t* th, const protocol_backup_request_t* b );
-static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d );
+    conn_t* th, const protocol_backup_request_t* b );
+static void blb_rocksdb_dump( conn_t* th, const protocol_dump_request_t* d );
 
 static const dbi_t blb_rocksdb_dbi = {
-    .thread_init = blb_rocksdb_thread_init,
-    .thread_deinit = blb_rocksdb_thread_deinit,
+    .thread_init = blb_rocksdb_conn_init,
+    .thread_deinit = blb_rocksdb_conn_deinit,
     .teardown = blb_rocksdb_teardown,
     .query = blb_rocksdb_query,
     .input = blb_rocksdb_input,
@@ -35,8 +35,8 @@ struct blb_rocksdb_t {
   rocksdb_writeoptions_t* writeoptions;
   rocksdb_readoptions_t* readoptions;
   rocksdb_mergeoperator_t* mergeop;
-  char scrtch_key[ROCKSDB_THREAD_SCRTCH_SZ];
-  char scrtch_inv[ROCKSDB_THREAD_SCRTCH_SZ];
+  char scrtch_key[ROCKSDB_CONN_SCRTCH_SZ];
+  char scrtch_inv[ROCKSDB_CONN_SCRTCH_SZ];
 };
 
 rocksdb_t* blb_rocksdb_handle( db_t* db );
@@ -240,12 +240,12 @@ static inline rocksdb_mergeoperator_t* blb_rocksdb_mergeoperator_create() {
       blb_rocksdb_mergeop_name ) );
 }
 
-db_t* blb_rocksdb_thread_init( thread_t* th, db_t* db ) {
+db_t* blb_rocksdb_conn_init( conn_t* th, db_t* db ) {
   ( void )th;
   return ( db );
 }
 
-void blb_rocksdb_thread_deinit( thread_t* th, db_t* db ) {
+void blb_rocksdb_conn_deinit( conn_t* th, db_t* db ) {
   ( void )th;
   ( void )db;
 }
@@ -264,7 +264,7 @@ void blb_rocksdb_teardown( db_t* _db ) {
 }
 
 static int blb_rocksdb_query_by_o(
-    thread_t* th, const protocol_query_request_t* q ) {
+    conn_t* th, const protocol_query_request_t* q ) {
   ASSERT( th->db->dbi == &blb_rocksdb_dbi );
   blb_rocksdb_t* db = ( blb_rocksdb_t* )th->db;
   size_t prefix_len = 0;
@@ -272,7 +272,7 @@ static int blb_rocksdb_query_by_o(
     prefix_len = q->qsensorid_len + q->qrrname_len + 4;
     ( void )snprintf(
         db->scrtch_key,
-        ROCKSDB_THREAD_SCRTCH_SZ,
+        ROCKSDB_CONN_SCRTCH_SZ,
         "o\x1f%.*s\x1f%.*s\x1f",
         ( int )q->qrrname_len,
         q->qrrname,
@@ -282,7 +282,7 @@ static int blb_rocksdb_query_by_o(
     prefix_len = q->qrrname_len + 3;
     ( void )snprintf(
         db->scrtch_key,
-        ROCKSDB_THREAD_SCRTCH_SZ,
+        ROCKSDB_CONN_SCRTCH_SZ,
         "o\x1f%.*s\x1f",
         ( int )q->qrrname_len,
         q->qrrname );
@@ -290,7 +290,7 @@ static int blb_rocksdb_query_by_o(
 
   X( log_debug( "prefix key `%.*s`", ( int )prefix_len, db->scrtch_key ) );
 
-  int start_ok = blb_thread_query_stream_start_response( th );
+  int start_ok = blb_conn_query_stream_start_response( th );
   if( start_ok != 0 ) {
     L( log_error( "unable to start query stream response" ) );
     return ( -1 );
@@ -409,14 +409,14 @@ static int blb_rocksdb_query_by_o(
     e->count = v.count;
     e->first_seen = v.first_seen;
     e->last_seen = v.last_seen;
-    int push_ok = blb_thread_query_stream_push_response( th, e );
+    int push_ok = blb_conn_query_stream_push_response( th, e );
     if( push_ok != 0 ) {
       L( log_error( "unable to push query response entry" ) );
       goto stream_error;
     }
   }
   rocksdb_iter_destroy( it );
-  ( void )blb_thread_query_stream_end_response( th );
+  ( void )blb_conn_query_stream_end_response( th );
   return ( 0 );
 
 stream_error:
@@ -425,7 +425,7 @@ stream_error:
 }
 
 static int blb_rocksdb_query_by_i(
-    thread_t* th, const protocol_query_request_t* q ) {
+    conn_t* th, const protocol_query_request_t* q ) {
   ASSERT( th->db->dbi == &blb_rocksdb_dbi );
   blb_rocksdb_t* db = ( blb_rocksdb_t* )th->db;
   size_t prefix_len = 0;
@@ -433,7 +433,7 @@ static int blb_rocksdb_query_by_i(
     prefix_len = q->qrdata_len + q->qsensorid_len + 4;
     ( void )snprintf(
         db->scrtch_inv,
-        ROCKSDB_THREAD_SCRTCH_SZ,
+        ROCKSDB_CONN_SCRTCH_SZ,
         "i\x1f%.*s\x1f%.*s\x1f",
         ( int )q->qrdata_len,
         q->qrdata,
@@ -443,7 +443,7 @@ static int blb_rocksdb_query_by_i(
     prefix_len = q->qrdata_len + 3;
     ( void )snprintf(
         db->scrtch_inv,
-        ROCKSDB_THREAD_SCRTCH_SZ,
+        ROCKSDB_CONN_SCRTCH_SZ,
         "i\x1f%.*s\x1f",
         ( int )q->qrdata_len,
         q->qrdata );
@@ -452,7 +452,7 @@ static int blb_rocksdb_query_by_i(
 
   X( log_debug( "prefix key `%.*s`", ( int )prefix_len, db->scrtch_inv ) );
 
-  int start_ok = blb_thread_query_stream_start_response( th );
+  int start_ok = blb_conn_query_stream_start_response( th );
   if( start_ok != 0 ) {
     L( log_error( "unable to start query stream response" ) );
     return ( -1 );
@@ -541,10 +541,10 @@ static int blb_rocksdb_query_by_i(
       continue;
     }
 
-    memset( db->scrtch_key, '\0', ROCKSDB_THREAD_SCRTCH_SZ );
+    memset( db->scrtch_key, '\0', ROCKSDB_CONN_SCRTCH_SZ );
     ( void )snprintf(
         db->scrtch_key,
-        ROCKSDB_THREAD_SCRTCH_SZ,
+        ROCKSDB_CONN_SCRTCH_SZ,
         "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
         toks[RRNAME].tok_len,
         toks[RRNAME].tok,
@@ -588,14 +588,14 @@ static int blb_rocksdb_query_by_i(
     e->count = v.count;
     e->first_seen = v.first_seen;
     e->last_seen = v.last_seen;
-    int push_ok = blb_thread_query_stream_push_response( th, e );
+    int push_ok = blb_conn_query_stream_push_response( th, e );
     if( push_ok != 0 ) {
       L( log_error( "unable to push query response entry" ) );
       goto stream_error;
     }
   }
   rocksdb_iter_destroy( it );
-  ( void )blb_thread_query_stream_end_response( th );
+  ( void )blb_conn_query_stream_end_response( th );
   return ( 0 );
 
 stream_error:
@@ -604,7 +604,7 @@ stream_error:
 }
 
 static int blb_rocksdb_query(
-    thread_t* th, const protocol_query_request_t* q ) {
+    conn_t* th, const protocol_query_request_t* q ) {
   int rc = -1;
   if( q->qrrname_len > 0 ) {
     rc = blb_rocksdb_query_by_o( th, q );
@@ -615,7 +615,7 @@ static int blb_rocksdb_query(
 }
 
 static void blb_rocksdb_backup(
-    thread_t* th, const protocol_backup_request_t* b ) {
+    conn_t* th, const protocol_backup_request_t* b ) {
   ASSERT( th->db->dbi == &blb_rocksdb_dbi );
   blb_rocksdb_t* db = ( blb_rocksdb_t* )th->db;
 
@@ -647,7 +647,7 @@ static void blb_rocksdb_backup(
   }
 }
 
-static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
+static void blb_rocksdb_dump( conn_t* th, const protocol_dump_request_t* d ) {
   ASSERT( th->db->dbi == &blb_rocksdb_dbi );
   blb_rocksdb_t* db = ( blb_rocksdb_t* )th->db;
 
@@ -728,9 +728,9 @@ static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
     e->first_seen = v.first_seen;
     e->last_seen = v.last_seen;
 
-    int rc = blb_thread_dump_entry( th, e );
+    int rc = blb_conn_dump_entry( th, e );
     if( rc != 0 ) {
-      L( log_error( "blb_thread_dump_entry() failed" ) );
+      L( log_error( "blb_conn_dump_entry() failed" ) );
       break;
     }
   }
@@ -743,21 +743,11 @@ static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
 }
 
 static int blb_rocksdb_input(
-    thread_t* th, const protocol_input_request_t* i ) {
+    conn_t* th, const protocol_input_request_t* i ) {
   ASSERT( th->db->dbi == &blb_rocksdb_dbi );
   blb_rocksdb_t* db = ( blb_rocksdb_t* )th->db;
 
-  X( log_debug(
-      "put `%.*s` `%.*s` `%.*s` `%.*s` %d",
-      ( int )i->entry.rdata_len,
-      i->entry.rdata,
-      ( int )i->entry.rrname_len,
-      i->entry.rrname,
-      ( int )i->entry.rrtype_len,
-      i->entry.rrtype,
-      ( int )i->entry.sensorid_len,
-      i->entry.sensorid,
-      i->entry.count ) );
+  X( blb_protocol_log_entry( &i->entry ) );
 
   value_t v = {.count = i->entry.count,
                .first_seen = i->entry.first_seen,
@@ -768,7 +758,7 @@ static int blb_rocksdb_input(
 
   ( void )snprintf(
       db->scrtch_key,
-      ROCKSDB_THREAD_SCRTCH_SZ,
+      ROCKSDB_CONN_SCRTCH_SZ,
       "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
       ( int )i->entry.rrname_len,
       i->entry.rrname,
@@ -781,7 +771,7 @@ static int blb_rocksdb_input(
 
   ( void )snprintf(
       db->scrtch_inv,
-      ROCKSDB_THREAD_SCRTCH_SZ,
+      ROCKSDB_CONN_SCRTCH_SZ,
       "i\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
       ( int )i->entry.rdata_len,
       i->entry.rdata,
