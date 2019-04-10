@@ -48,8 +48,9 @@ static int blb_thread_cnt_get() {
 }
 
 static inline int blb_engine_poll_write( int fd, int seconds ) {
+timeout_retry:
   if( blb_engine_poll_stop() > 0 ) {
-    V( prnl( "engine stop detected" ) );
+    L( log_notice( "engine stop detected" ) );
     return ( -1 );
   }
   fd_set fds;
@@ -60,10 +61,10 @@ static inline int blb_engine_poll_write( int fd, int seconds ) {
   to.tv_usec = 0;
   int rc = select( fd + 1, NULL, &fds, NULL, &to );
   if( rc == 0 ) {
-    X( prnl( "select() timeout" ) );
-    return ( -1 );
+    X( log_debug( "select() timeout => retry polling" ) );
+    goto timeout_retry;
   } else if( rc < 0 ) {
-    X( prnl( "select() failed `%s`", strerror( errno ) ) );
+    X( log_debug( "select() failed `%s`", strerror( errno ) ) );
     return ( -1 );
   }
   return ( 0 );
@@ -72,7 +73,7 @@ static inline int blb_engine_poll_write( int fd, int seconds ) {
 static inline int blb_engine_poll_read( int fd, int seconds ) {
 timeout_retry:
   if( blb_engine_poll_stop() > 0 ) {
-    V( prnl( "engine stop detected" ) );
+    L( log_notice( "engine stop detected" ) );
     return ( -1 );
   }
   fd_set fds;
@@ -83,10 +84,10 @@ timeout_retry:
   to.tv_usec = 0;
   int rc = select( fd + 1, &fds, NULL, NULL, &to );
   if( rc == 0 ) {
-    X( prnl( "select() timeout" ) );
+    X( log_debug( "select() timeout => retry polling" ) );
     goto timeout_retry;
   } else if( rc < 0 ) {
-    X( prnl( "select() failed `%s`", strerror( errno ) ) );
+    X( log_debug( "select() failed `%s`", strerror( errno ) ) );
     return ( -1 );
   }
   return ( 0 );
@@ -95,7 +96,7 @@ timeout_retry:
 static int blb_thread_write_all( thread_t* th, char* _p, size_t _p_sz ) {
   int wr_ok = blb_engine_poll_write( th->fd, ENGINE_POLL_WRITE_TIMEOUT );
   if( wr_ok != 0 ) {
-    L( prnl( "blb_engine_poll_write() timeout or error" ) );
+    L( log_error( "blb_engine_poll_write() failed" ) );
     return ( -1 );
   }
   char* p = _p;
@@ -103,7 +104,7 @@ static int blb_thread_write_all( thread_t* th, char* _p, size_t _p_sz ) {
   while( r > 0 ) {
     ssize_t rc = write( th->fd, p, r );
     if( rc < 0 ) {
-      L( prnl( "write() failed error `%s`", strerror( errno ) ) );
+      L( log_error( "write() failed error `%s`", strerror( errno ) ) );
       return ( -1 );
     } else if( rc == 0 && errno == EINTR ) {
       continue;
@@ -116,14 +117,14 @@ static int blb_thread_write_all( thread_t* th, char* _p, size_t _p_sz ) {
 
 int blb_thread_query_stream_start_response( thread_t* th ) {
   if( blb_engine_poll_stop() > 0 ) {
-    L( prnl( "thread <%04lx> engine stop detected", th->thread ) );
+    L( log_notice( "thread <%04lx> engine stop detected", th->thread ) );
     return ( -1 );
   }
 
   ssize_t used = blb_protocol_encode_stream_start_response(
       th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
   if( used <= 0 ) {
-    L( prnl( "blb_protocol_encode_stream_start_response() failed" ) );
+    L( log_error( "blb_protocol_encode_stream_start_response() failed" ) );
     return ( -1 );
   }
 
@@ -131,32 +132,18 @@ int blb_thread_query_stream_start_response( thread_t* th ) {
 }
 
 int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
-  WHEN_X {
-    theTrace_lock();
-    prnl( "dump stream push entry" );
-    prnl(
-        "<%d `%.*s` `%.*s` `%.*s` `%.*s`>",
-        entry->count,
-        ( int )entry->rrname_len,
-        entry->rrname,
-        ( int )entry->rrtype_len,
-        entry->rrtype,
-        ( int )entry->rdata_len,
-        entry->rdata,
-        ( int )entry->sensorid_len,
-        entry->sensorid );
-    theTrace_release();
-  }
+  X( log_debug( "dump stream push entry" ) );
+  X( blb_protocol_log_entry( entry ) );
 
   if( blb_engine_poll_stop() > 0 ) {
-    L( prnl( "thread <%04lx> engine stop detected", th->thread ) );
+    L( log_notice( "thread <%04lx> engine stop detected", th->thread ) );
     return ( -1 );
   }
 
   ssize_t used = blb_protocol_encode_dump_entry(
       entry, th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
   if( used <= 0 ) {
-    L( prnl( "blb_protocol_encode_dump_entry() failed" ) );
+    L( log_error( "blb_protocol_encode_dump_entry() failed" ) );
     return ( -1 );
   }
 
@@ -165,32 +152,18 @@ int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
 
 int blb_thread_query_stream_push_response(
     thread_t* th, const protocol_entry_t* entry ) {
-  WHEN_X {
-    theTrace_lock();
-    prnl( "query stream push entry" );
-    prnl(
-        "<%d `%.*s` `%.*s` `%.*s` `%.*s`>",
-        entry->count,
-        ( int )entry->rrname_len,
-        entry->rrname,
-        ( int )entry->rrtype_len,
-        entry->rrtype,
-        ( int )entry->rdata_len,
-        entry->rdata,
-        ( int )entry->sensorid_len,
-        entry->sensorid );
-    theTrace_release();
-  };
+  X( log_debug( "query stream push entry" ) );
+  X( blb_protocol_log_entry( entry ) );
 
   if( blb_engine_poll_stop() > 0 ) {
-    L( prnl( "thread <%04lx> engine stop detected", th->thread ) );
+    L( log_notice( "thread <%04lx> engine stop detected", th->thread ) );
     return ( -1 );
   }
 
   ssize_t used = blb_protocol_encode_stream_entry(
       entry, th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
   if( used <= 0 ) {
-    L( prnl( "blb_protocol_encode_stream_entry() failed" ) );
+    L( log_error( "blb_protocol_encode_stream_entry() failed" ) );
     return ( -1 );
   }
 
@@ -199,18 +172,18 @@ int blb_thread_query_stream_push_response(
 
 int blb_thread_query_stream_end_response( thread_t* th ) {
   if( blb_engine_poll_stop() > 0 ) {
-    L( prnl( "thread <%04lx> engine stop detected", th->thread ) );
+    L( log_error( "thread <%04lx> engine stop detected", th->thread ) );
     return ( -1 );
   }
 
   ssize_t used = blb_protocol_encode_stream_end_response(
       th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
   if( used <= 0 ) {
-    L( prnl( "blb_protocol_encode_stream_end_response() failed" ) );
+    L( log_error( "blb_protocol_encode_stream_end_response() failed" ) );
     return ( -1 );
   }
 
-  X( prnl( "blb_protocol_encode_stream_end_response() returned `%zd`", used ) );
+  X( log_debug( "blb_protocol_encode_stream_end_response() returned `%zd`", used ) );
 
   return ( blb_thread_write_all( th, th->scrtch_response, used ) );
 }
@@ -240,15 +213,15 @@ static ssize_t blb_thread_read_stream_cb( void* usr, char* p, size_t p_sz ) {
   thread_t* th = usr;
   int fd_ok = blb_engine_poll_read( th->fd, ENGINE_POLL_READ_TIMEOUT );
   if( fd_ok != 0 ) {
-    V( prnl( "engine poll read failed" ) );
+    L( log_error( "engine poll read failed" ) );
     return ( 0 );
   }
   ssize_t rc = read( th->fd, p, p_sz );
   if( rc < 0 ) {
-    V( prnl( "read() failed: `%s`", strerror( errno ) ) );
+    L( log_error( "read() failed `%s`", strerror( errno ) ) );
     return ( -1 );
   } else if( rc == 0 ) {
-    X( prnl( "read() eof" ) );
+    X( log_debug( "read() eof" ) );
     return ( 0 );
   }
   return ( rc );
@@ -270,7 +243,7 @@ static inline int blb_engine_thread_consume_query(
     thread_t* th, const protocol_query_request_t* query ) {
   int query_ok = blb_dbi_query( th, query );
   if( query_ok != 0 ) {
-    L( prnl( "blb_dbi_query() failed" ) );
+    L( log_error( "blb_dbi_query() failed" ) );
     return ( -1 );
   }
   return ( 0 );
@@ -280,7 +253,7 @@ static inline int blb_engine_thread_consume_input(
     thread_t* th, const protocol_input_request_t* input ) {
   int input_ok = blb_dbi_input( th, input );
   if( input_ok != 0 ) {
-    L( prnl( "blb_dbi_input() failed" ) );
+    L( log_error( "blb_dbi_input() failed" ) );
     return ( -1 );
   }
   return ( 0 );
@@ -297,7 +270,7 @@ static inline int blb_engine_thread_consume(
     return ( blb_engine_thread_consume_dump( th, &msg->u.dump ) );
   case PROTOCOL_QUERY_REQUEST:
     return ( blb_engine_thread_consume_query( th, &msg->u.query ) );
-  default: L( prnl( "invalid message type `%d`", msg->ty ) ); return ( -1 );
+  default: L( log_debug( "invalid message type `%d`", msg->ty ) ); return ( -1 );
   }
 }
 
@@ -305,7 +278,7 @@ static void* blb_engine_thread_fn( void* usr ) {
   ASSERT( usr != NULL );
   thread_t* th = usr;
   blb_thread_cnt_incr();
-  T( prnl( "new thread is <%04lx>", th->thread ) );
+  T( log_info( "new thread is <%04lx>", th->thread ) );
 
   protocol_stream_t* stream = blb_protocol_stream_new(
       th,
@@ -313,19 +286,19 @@ static void* blb_engine_thread_fn( void* usr ) {
       ENGINE_MAX_MESSAGE_SZ,
       ENGINE_MAX_MESSAGE_NODES );
   if( stream == NULL ) {
-    L( prnl( "unalbe to create protocol decode stream" ) );
+    L( log_error( "unalbe to create protocol decode stream" ) );
     goto thread_exit;
   }
 
   protocol_message_t msg;
   while( 1 ) {
     if( blb_engine_poll_stop() > 0 ) {
-      V( prnl( "thread <%04lx> engine stop detected", th->thread ) );
+      L( log_notice( "thread <%04lx> engine stop detected", th->thread ) );
       goto thread_exit;
     }
     int rc = blb_protocol_stream_decode( stream, &msg );
     if( rc != 0 ) {
-      L( prnl( "blb_protocol_stream_decode() failed" ) );
+      L( log_error( "blb_protocol_stream_decode() failed" ) );
       goto thread_exit;
     }
     int th_rc = blb_engine_thread_consume( th, &msg );
@@ -333,7 +306,7 @@ static void* blb_engine_thread_fn( void* usr ) {
   }
 
 thread_exit:
-  T( prnl( "finished thread is <%04lx>", th->thread ) );
+  T( log_info( "thread <%04lx> is shutting down", th->thread ) );
   if( stream != NULL ) { blb_protocol_stream_teardown( stream ); }
   blb_thread_cnt_decr();
   blb_engine_thread_teardown( th );
@@ -354,16 +327,21 @@ engine_t* blb_engine_new(
   ipv4->sin_family = AF_INET;
   ipv4->sin_port = htons( ( uint16_t )port );
   int fd = socket( ipv4->sin_family, SOCK_STREAM, 0 );
-  if( fd < 0 ) { return ( NULL ); }
+  if( fd < 0 ) {
+    L( log_error( "socket() failed with `%s`", strerror( errno ) ) );
+    return ( NULL );
+  }
   int reuse = 1;
   ( void )setsockopt( fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof( reuse ) );
   int bind_rc = bind( fd, ipv4, sizeof( struct sockaddr_in ) );
   if( bind_rc < 0 ) {
+    L( log_error( "bind() failed with `%s`", strerror( errno ) ) );
     close( fd );
     return ( NULL );
   }
   int listen_rc = listen( fd, SOMAXCONN );
   if( listen_rc < 0 ) {
+    L( log_error( "listen() failed with `%s`", strerror( errno ) ) );
     close( fd );
     return ( NULL );
   }
@@ -378,7 +356,7 @@ engine_t* blb_engine_new(
   e->db = db;
   e->listen_fd = fd;
 
-  V( prnl( "listening on host `%s` port `%d` fd `%d`", name, port, fd ) );
+  V( log_info( "listening on host `%s` port `%d` fd `%d`", name, port, fd ) );
 
   return ( e );
 }
@@ -393,21 +371,21 @@ static void* blb_engine_signal_consume( void* usr ) {
   sigaddset( &s, SIGINT );
   sigaddset( &s, SIGPIPE );
   sigaddset( &s, SIGTERM );
-  V( prnl( "signal consumer thread started" ) );
+  V( log_info( "signal consumer thread started" ) );
   while( 1 ) {
     int sig = 0;
     int rc = sigwait( &s, &sig );
-    V( prnl( "sigwait() returned `%d` (signal `%d`)", rc, sig ) );
+    V( log_debug( "sigwait() returned `%d` (signal `%d`)", rc, sig ) );
     if( rc != 0 ) { continue; }
-    L( prnl( "received signal `%d`", sig ) );
+    L( log_notice( "received signal `%d`", sig ) );
     switch( sig ) {
     case SIGINT:
     case SIGTERM:
     case SIGQUIT:
-      L( prnl( "requesting engine stop due to received signal" ) );
+      L( log_warn( "requesting engine stop due to received signal" ) );
       blb_engine_request_stop();
       break;
-    default: L( prnl( "ignoring signal" ) ); break;
+    default: L( log_warn( "ignoring signal" ) ); break;
     }
   }
   return ( NULL );
@@ -423,7 +401,7 @@ void blb_engine_signals_init( void ) {
   sigaddset( &s, SIGPIPE );
   sigaddset( &s, SIGTERM );
   int rc = pthread_sigmask( SIG_BLOCK, &s, NULL );
-  if( rc != 0 ) { L( prnl( "pthread_sigmask() failed `%d`", rc ) ); }
+  if( rc != 0 ) { L( log_error( "pthread_sigmask() failed `%d`", rc ) ); }
 
   pthread_t signal_consumer;
   pthread_create( &signal_consumer, NULL, blb_engine_signal_consume, NULL );
@@ -442,12 +420,12 @@ void blb_engine_run( engine_t* e ) {
   while( 1 ) {
   timeout_retry:
     if( blb_engine_poll_stop() > 0 ) {
-      V( prnl( "engine stop detected" ) );
-      goto wait;
+      L( log_notice( "engine stop detected" ) );
+      goto teardown;
     }
     if( blb_thread_cnt_get() >= e->thread_throttle_limit ) {
       sleep( 1 );
-      V( prnl( "thread throttle reached" ) );
+      L( log_warn( "thread throttle reached" ) );
       goto timeout_retry;
     }
     FD_ZERO( &fds );
@@ -456,39 +434,39 @@ void blb_engine_run( engine_t* e ) {
     to.tv_usec = 0;
     int rc = select( e->listen_fd + 1, &fds, NULL, NULL, &to );
     if( rc == 0 ) {
-      X( prnl( "select() timeout" ) );
+      X( log_debug( "select() timeout" ) );
       goto timeout_retry;
     } else if( rc < 0 ) {
-      X( prnl( "select() failed `%s`", strerror( errno ) ) );
-      goto wait;
+      L( log_error( "select() failed `%s`", strerror( errno ) ) );
+      goto teardown;
     }
     socket_t fd = accept( e->listen_fd, ( struct sockaddr* )addr, &addrlen );
     if( fd < 0 ) {
-      V( prnl( "accept() failed: `%s`; exiting", strerror( errno ) ) );
+      L( log_error( "accept() failed: `%s`", strerror( errno ) ) );
       blb_engine_request_stop();
-      goto wait;
+      goto teardown;
     }
     thread_t* th = blb_engine_thread_new( e, fd );
     if( th == NULL ) {
-      V( prnl( "blb_engine_thread_new() failed; exiting" ) );
+      L( log_error( "blb_engine_thread_new() failed" ) );
       blb_engine_request_stop();
-      goto wait;
+      goto teardown;
     }
 
     ( void )pthread_create(
         &th->thread, &__attr, blb_engine_thread_fn, ( void* )th );
   }
 
-wait:
+teardown:
 
   pthread_attr_destroy( &__attr );
 
   while( blb_thread_cnt_get() > 0 ) {
-    L( prnl( "waiting for `%d` threads to finish", blb_thread_cnt_get() ) );
-    sleep( 1 );
+    L( log_warn( "waiting for `%d` thread(s) to finish", blb_thread_cnt_get() ) );
+    sleep( 2 );
   }
 
-  L( prnl( "done" ) );
+  L( log_notice( "all threads finished" ) );
 }
 
 void blb_engine_teardown( engine_t* e ) {

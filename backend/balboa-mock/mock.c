@@ -49,7 +49,7 @@ static int blb_mock_query( thread_t* th, const protocol_query_request_t* q ) {
 
   int start_ok = blb_thread_query_stream_start_response( th );
   if( start_ok != 0 ) {
-    V( prnl( "unable to start query stream response" ) );
+    L( log_error( "unable to start query stream response" ) );
     return ( -1 );
   }
 
@@ -67,7 +67,7 @@ static int blb_mock_query( thread_t* th, const protocol_query_request_t* q ) {
   e->last_seen = 15001000;
   int push_ok = blb_thread_query_stream_push_response( th, e );
   if( push_ok != 0 ) {
-    X( prnl( "unable to push query response entry" ) );
+    L( log_error( "unable to push query response entry" ) );
     return ( -1 );
   }
 
@@ -78,21 +78,8 @@ static int blb_mock_query( thread_t* th, const protocol_query_request_t* q ) {
 
 static int blb_mock_input( thread_t* th, const protocol_input_request_t* i ) {
   ASSERT( th->db->dbi == &blb_mock_dbi );
-  // blb_mock_t* db=(blb_mock_t*)th->db;
 
-  X( prnl(
-      "put `%.*s` `%.*s` `%.*s` `%.*s` `%u` `%u` `%u`",
-      ( int )i->entry.rdata_len,
-      i->entry.rdata,
-      ( int )i->entry.rrname_len,
-      i->entry.rrname,
-      ( int )i->entry.rrtype_len,
-      i->entry.rrtype,
-      ( int )i->entry.sensorid_len,
-      i->entry.sensorid,
-      i->entry.count,
-      i->entry.first_seen,
-      i->entry.last_seen) );
+  T( blb_protocol_log_entry( &i->entry ) );
 
   return ( 0 );
 }
@@ -102,20 +89,19 @@ static void blb_mock_backup(
   ASSERT( th->db->dbi == &blb_mock_dbi );
   // blb_mock_t* db=(blb_mock_t*)th->db;
 
-  X( prnl( "backup `%.*s`", ( int )b->path_len, b->path ) );
+  T( log_debug( "backup `%.*s`", ( int )b->path_len, b->path ) );
 }
 
 static void blb_mock_dump( thread_t* th, const protocol_dump_request_t* d ) {
   ASSERT( th->db->dbi == &blb_mock_dbi );
   // blb_mock_t* db=(blb_mock_t*)th->db;
 
-  X( prnl( "dump `%.*s`", ( int )d->path_len, d->path ) );
+  T( log_debug( "dump `%.*s`", ( int )d->path_len, d->path ) );
 }
 
 db_t* blb_mock_open() {
   blb_mock_t* db = blb_new( blb_mock_t );
   if( db == NULL ) { return ( NULL ); }
   db->dbi = &blb_mock_dbi;
-
   return ( ( db_t* )db );
 }

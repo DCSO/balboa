@@ -46,7 +46,7 @@ int main( int argc, char** argv ) {
 
   engine_t* e = blb_engine_new( db, host, port, thread_throttle_limit );
   if( e == NULL ) {
-    V( prnl( "unable to create engine" ) );
+    L( log_error( "unable to create engine" ) );
     blb_dbi_teardown( db );
     return ( 1 );
   }

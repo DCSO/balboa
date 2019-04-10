@@ -58,15 +58,6 @@ static void trace_output_systemd(
   vfprintf( trace->config.stream, fmt, ap );
 }
 
-static void trace_output(
-    trace_t* trace, int priority, const char* fmt, va_list ap ) {
-  if( trace->config.rfc5424 ) {
-    trace_output_rfc5424( trace, priority, fmt, ap );
-  } else {
-    trace_output_systemd( trace, priority, fmt, ap );
-  }
-}
-
 static void trace_inject( trace_t* trace, const char* fmt, va_list ap ) {
   vfprintf( trace->config.stream, fmt, ap );
 }
@@ -78,6 +69,9 @@ static void trace_flush( trace_t* trace ) {
 
 static void trace_init( trace_t* trace, const trace_config_t* config ) {
   trace->config = *config;
+  if( config->rfc5424 ){
+    trace->output = trace_output_rfc5424;
+  }
   pthread_mutex_init( &trace->_lock, NULL );
 }
 
@@ -86,7 +80,7 @@ static trace_t __theTrace_stdout = {.verbosity = ATOMIC_VAR_INIT( 0 ),
                                     .release = trace_release,
                                     .init = trace_init,
                                     .lock = trace_lock,
-                                    .output = trace_output,
+                                    .output = trace_output_systemd,
                                     .inject = trace_inject,
                                     .flush = trace_flush};
 

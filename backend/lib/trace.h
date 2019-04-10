@@ -40,14 +40,34 @@
     theTrace_release(); \
   } while( 0 )
 
-#define prnl( fmt, ... ) \
-  theTrace_output( 6, "(%s) " fmt "\n", __func__, ##__VA_ARGS__ )
-#define out( fmt, ... ) theTrace_output( 7, fmt, ##__VA_ARGS__ )
-#define panic( fmt, ... )                                            \
-  do {                                                               \
-    theTrace_output( 0, "(%s) " fmt "\n", __func__, ##__VA_ARGS__ ); \
-    exit( 0 );                                                       \
+// 0 Emergency: system is unusable
+// 1 Alert: action must be taken immediately
+// 2 Critical: critical conditions
+// 3 Error: error conditions
+// 4 Warning: warning conditions
+// 5 Notice: normal but significant condition
+// 6 Informational: informational messages
+// 7 Debug: debug-level messages
+#define log_emergency( fmt, ... )                                        \
+  do {                                                                   \
+    theTrace_output( 0, "(%s) " fmt "\n", __FUNCTION__, ##__VA_ARGS__ ); \
+    exit( 1 );                                                           \
   } while( 0 )
+#define log_alert( fmt, ... ) \
+  theTrace_output( 1, "(%s) " fmt "\n", __FUNCTION__, ##__VA_ARGS__ )
+#define log_crit( fmt, ... ) \
+  theTrace_output( 2, "(%s) " fmt "\n", __FUNCTION__, ##__VA_ARGS__ )
+#define log_error( fmt, ... ) \
+  theTrace_output( 3, "(%s) " fmt "\n", __FUNCTION__, ##__VA_ARGS__ )
+#define log_warn( fmt, ... ) \
+  theTrace_output( 4, "(%s) " fmt "\n", __FUNCTION__, ##__VA_ARGS__ )
+#define log_notice( fmt, ... ) \
+  theTrace_output( 5, "(%s) " fmt "\n", __FUNCTION__, ##__VA_ARGS__ )
+#define log_info( fmt, ... ) \
+  theTrace_output( 6, "(%s) " fmt "\n", __FUNCTION__, ##__VA_ARGS__ )
+#define log_debug( fmt, ... ) \
+  theTrace_output( 7, "(%s) " fmt "\n", __FUNCTION__, ##__VA_ARGS__ )
+#define log_inject( fmt, ... ) theTrace_inject( fmt, ##__VA_ARGS__ )
 
 #define WHEN_V if( theTrace_get_verbosity() > 0 )
 #define WHEN_T if( theTrace_get_verbosity() > 1 )
@@ -56,14 +76,12 @@
 #define ASSERT( p )                        \
   do {                                     \
     if( !( p ) ) {                         \
-      prnl(                                \
-          "assert failed `%s` [%s:%s:%d]", \
+      log_emergency(                       \
+          "assert failed `%s` (%s:%s:%d)", \
           #p,                              \
           __FILE__,                        \
           __FUNCTION__,                    \
           __LINE__ );                      \
-      __builtin_trap();                    \
-      exit( 0 );                           \
     }                                      \
   } while( 0 )
 

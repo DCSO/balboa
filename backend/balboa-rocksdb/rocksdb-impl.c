@@ -124,12 +124,12 @@ static char* blb_rocksdb_merge_fully(
     size_t* new_value_length ) {
   ( void )state;
   if( key_length < 1 ) {
-    L( prnl( "impossible: key too short" ) );
+    L( log_error( "impossible: key too short" ) );
     *success = ( unsigned char )0;
     return ( NULL );
   }
   if( key[0] == 'i' ) {
-    L( prnl( "impossible: got an inverted key during merge" ) );
+    L( log_error( "impossible: got an inverted key during merge" ) );
     // this is an inverted index key with no meaningful value
     char* res = malloc( sizeof( char ) * 1 );
     if( res == NULL ) { return ( NULL ); }
@@ -153,7 +153,7 @@ static char* blb_rocksdb_merge_fully(
     *success = ( unsigned char )1;
     return ( buf );
   } else {
-    L( prnl( "impossbile: unknown key format encountered" ) );
+    L( log_error( "impossbile: unknown key format encountered" ) );
     *success = ( unsigned char )0;
     return ( NULL );
   }
@@ -172,7 +172,7 @@ static char* blb_rocksdb_mergeop_full_merge(
     size_t* new_value_length ) {
   ( void )state;
   if( key_length < 1 ) {
-    L( prnl( "impossible: key to short" ) );
+    L( log_error( "impossible: key to short" ) );
     *success = ( unsigned char )0;
     return ( NULL );
   }
@@ -203,7 +203,7 @@ static char* blb_rocksdb_mergeop_partial_merge(
     unsigned char* success,
     size_t* new_value_length ) {
   if( key_length < 1 ) {
-    V( prnl( "impossible: key too short" ) );
+    V( log_error( "impossible: key too short" ) );
     *success = ( unsigned char )0;
     return ( NULL );
   }
@@ -288,11 +288,11 @@ static int blb_rocksdb_query_by_o(
         q->qrrname );
   }
 
-  X( prnl( "prefix key `%.*s`", ( int )prefix_len, db->scrtch_key ) );
+  X( log_debug( "prefix key `%.*s`", ( int )prefix_len, db->scrtch_key ) );
 
   int start_ok = blb_thread_query_stream_start_response( th );
   if( start_ok != 0 ) {
-    V( prnl( "unable to start query stream response" ) );
+    L( log_error( "unable to start query stream response" ) );
     return ( -1 );
   }
 
@@ -307,7 +307,7 @@ static int blb_rocksdb_query_by_o(
     size_t key_len = 0;
     const char* key = rocksdb_iter_key( it, &key_len );
     if( key == NULL ) {
-      V( prnl( "impossible: unable to extract key from rocksdb iterator" ) );
+      L( log_error( "impossible: unable to extract key from rocksdb iterator" ) );
       goto stream_error;
     }
 
@@ -338,7 +338,7 @@ static int blb_rocksdb_query_by_o(
     toks[RDATA].tok_len = key_len - last - 1;
 
     X(
-        out( "o %.*s %.*s %.*s %.*s\n",
+        log_debug( "o %.*s %.*s %.*s %.*s",
              toks[RRNAME].tok_len,
              toks[RRNAME].tok,
              toks[SENSORID].tok_len,
@@ -392,7 +392,7 @@ static int blb_rocksdb_query_by_o(
     const char* val = rocksdb_iter_value( it, &val_size );
     int ret = blb_rocksdb_val_decode( &v, val, val_size );
     if( ret != 0 ) {
-      X( prnl( "unable to decode observation value; skipping entry" ) );
+      L( log_error( "unable to decode observation value; skipping entry" ) );
       continue;
     }
 
@@ -411,7 +411,7 @@ static int blb_rocksdb_query_by_o(
     e->last_seen = v.last_seen;
     int push_ok = blb_thread_query_stream_push_response( th, e );
     if( push_ok != 0 ) {
-      X( prnl( "unable to push query response entry" ) );
+      L( log_error( "unable to push query response entry" ) );
       goto stream_error;
     }
   }
@@ -450,11 +450,11 @@ static int blb_rocksdb_query_by_i(
   }
   ASSERT( db->scrtch_inv[prefix_len] == '\0' );
 
-  X( prnl( "prefix key `%.*s`", ( int )prefix_len, db->scrtch_inv ) );
+  X( log_debug( "prefix key `%.*s`", ( int )prefix_len, db->scrtch_inv ) );
 
   int start_ok = blb_thread_query_stream_start_response( th );
   if( start_ok != 0 ) {
-    V( prnl( "unable to start query stream response" ) );
+    L( log_error( "unable to start query stream response" ) );
     return ( -1 );
   }
 
@@ -494,9 +494,9 @@ static int blb_rocksdb_query_by_i(
     toks[RDATA].tok = key + 2;
     toks[RDATA].tok_len = toks[RDATA].tok_len + last - 1;
 
-    X( out( "k `%zu` `%.*s`\n", key_len, ( int )key_len, key ) );
+    X( log_debug( "k `%zu` `%.*s`", key_len, ( int )key_len, key ) );
     X(
-        out( "i `%.*s` | `%.*s` `%.*s` `%.*s`\n",
+        log_debug( "i `%.*s` | `%.*s` `%.*s` `%.*s`",
              toks[RDATA].tok_len,
              toks[RDATA].tok,
              toks[SENSORID].tok_len,
@@ -507,7 +507,7 @@ static int blb_rocksdb_query_by_i(
              toks[RRNAME].tok ) );
 
     if( j < FIELDS ){
-      L( prnl( "found invalid key `%.*s`; skipping ...", (int)key_len, key) );
+      L( log_error( "found invalid key `%.*s`; skipping ...", (int)key_len, key) );
       continue;
     }
 
@@ -555,21 +555,21 @@ static int blb_rocksdb_query_by_i(
         toks[RDATA].tok_len,
         toks[RDATA].tok );
 
-    X( prnl( "full key `%s`", db->scrtch_key ) );
+    X( log_debug( "full key `%s`", db->scrtch_key ) );
 
     size_t fullkey_len = strlen( db->scrtch_key );
     size_t val_size = 0;
     char* val = rocksdb_get(
         db->db, db->readoptions, db->scrtch_key, fullkey_len, &val_size, &err );
     if( val == NULL || err != NULL ) {
-      X( prnl( "rocksdb_get() observation not found" ) );
+      X( log_debug( "rocksdb_get() observation not found" ) );
       continue;
     }
 
     value_t v;
     int ret = blb_rocksdb_val_decode( &v, val, val_size );
     if( ret != 0 ) {
-      X( prnl( "unable to decode observation value; skipping entry" ) );
+      L( log_error( "unable to decode observation value; skipping entry" ) );
       free( val );
       continue;
     }
@@ -590,7 +590,7 @@ static int blb_rocksdb_query_by_i(
     e->last_seen = v.last_seen;
     int push_ok = blb_thread_query_stream_push_response( th, e );
     if( push_ok != 0 ) {
-      X( prnl( "unable to push query response entry" ) );
+      L( log_error( "unable to push query response entry" ) );
       goto stream_error;
     }
   }
@@ -619,10 +619,10 @@ static void blb_rocksdb_backup(
   ASSERT( th->db->dbi == &blb_rocksdb_dbi );
   blb_rocksdb_t* db = ( blb_rocksdb_t* )th->db;
 
-  X( prnl( "backup `%.*s`", ( int )b->path_len, b->path ) );
+  X( log_info( "backup `%.*s`", ( int )b->path_len, b->path ) );
 
   if( b->path_len >= 256 ) {
-    L( prnl( "invalid path" ) );
+    L( log_error( "invalid path" ) );
     return;
   }
 
@@ -633,14 +633,14 @@ static void blb_rocksdb_backup(
   rocksdb_backup_engine_t* be =
       rocksdb_backup_engine_open( db->options, path, &err );
   if( err != NULL ) {
-    L( prnl( "rocksdb_backup_engine_open() failed `%s`", err ) );
+    L( log_error( "rocksdb_backup_engine_open() failed `%s`", err ) );
     free( err );
     return;
   }
 
   rocksdb_backup_engine_create_new_backup( be, db->db, &err );
   if( err != NULL ) {
-    L( prnl( "rocksdb_backup_engine_create_new_backup() failed `%s`", err ) );
+    L( log_error( "rocksdb_backup_engine_create_new_backup() failed `%s`", err ) );
     free( err );
     rocksdb_backup_engine_close( be );
     return;
@@ -651,7 +651,7 @@ static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
   ASSERT( th->db->dbi == &blb_rocksdb_dbi );
   blb_rocksdb_t* db = ( blb_rocksdb_t* )th->db;
 
-  X( prnl( "dump `%.*s`", ( int )d->path_len, d->path ) );
+  X( log_info( "dump `%.*s`", ( int )d->path_len, d->path ) );
 
   uint64_t cnt = 0;
   rocksdb_iterator_t* it = rocksdb_create_iterator( db->db, db->readoptions );
@@ -662,7 +662,7 @@ static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
     size_t key_len = 0;
     const char* key = rocksdb_iter_key( it, &key_len );
     if( key == NULL ) {
-      L( prnl( "impossible: unable to extract key from rocksdb iterator" ) );
+      L( log_error( "impossible: unable to extract key from rocksdb iterator" ) );
       break;
     }
 
@@ -695,7 +695,7 @@ static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
     toks[RDATA].tok_len = key_len - last - 1;
 
     X(
-        out( "o %.*s %.*s %.*s %.*s\n",
+        log_debug( "o %.*s %.*s %.*s %.*s",
              toks[RRNAME].tok_len,
              toks[RRNAME].tok,
              toks[SENSORID].tok_len,
@@ -710,7 +710,7 @@ static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
     const char* val = rocksdb_iter_value( it, &val_size );
     int ret = blb_rocksdb_val_decode( &v, val, val_size );
     if( ret != 0 ) {
-      X( prnl( "unable to decode observation value; skipping entry" ) );
+      L( log_error( "blb_rocksdb_val_decode() failed" ) );
       continue;
     }
 
@@ -730,16 +730,16 @@ static void blb_rocksdb_dump( thread_t* th, const protocol_dump_request_t* d ) {
 
     int rc = blb_thread_dump_entry( th, e );
     if( rc != 0 ) {
-      L( prnl( "unable to dump entry" ) );
+      L( log_error( "blb_thread_dump_entry() failed" ) );
       break;
     }
   }
 
   char* err = NULL;
   rocksdb_iter_get_error( it, &err );
-  if( err != NULL ) { L( prnl( "iterator error `%s`", err ) ); }
+  if( err != NULL ) { L( log_error( "iterator error `%s`", err ) ); }
   rocksdb_iter_destroy( it );
-  L( prnl( "dumped `%" PRIu64 "` entries", cnt ) );
+  L( log_notice( "dumped `%" PRIu64 "` entries", cnt ) );
 }
 
 static int blb_rocksdb_input(
@@ -747,7 +747,7 @@ static int blb_rocksdb_input(
   ASSERT( th->db->dbi == &blb_rocksdb_dbi );
   blb_rocksdb_t* db = ( blb_rocksdb_t* )th->db;
 
-  X( prnl(
+  X( log_debug(
       "put `%.*s` `%.*s` `%.*s` `%.*s` %d",
       ( int )i->entry.rdata_len,
       i->entry.rdata,
@@ -802,7 +802,7 @@ static int blb_rocksdb_input(
       val_len,
       &err );
   if( err != NULL ) {
-    V( prnl( "rocksdb_merge() failed: `%s`", err ) );
+    L( log_error( "rocksdb_merge() failed: `%s`", err ) );
     free( err );
     return ( -1 );
   }
@@ -817,7 +817,7 @@ static int blb_rocksdb_input(
       0,
       &err );
   if( err != NULL ) {
-    V( prnl( "rocksdb_put() failed: `%s`", err ) );
+    L( log_error( "rocksdb_put() failed: `%s`", err ) );
     free( err );
     return ( -1 );
   }
@@ -832,8 +832,8 @@ rocksdb_t* blb_rocksdb_handle( db_t* _db ) {
 }
 
 db_t* blb_rocksdb_open( const blb_rocksdb_config_t* c ) {
-  V( prnl( "rocksdb database at `%s`", c->path ) );
-  V( prnl(
+  V( log_info( "rocksdb database at `%s`", c->path ) );
+  V( log_info(
       "parallelism `%d` membudget `%zu` max_log_file_size `%zu` "
       "keep_log_file_num `%d`",
       c->parallelism,
@@ -868,7 +868,7 @@ db_t* blb_rocksdb_open( const blb_rocksdb_config_t* c ) {
 
   db->db = rocksdb_open( db->options, c->path, &err );
   if( err != NULL ) {
-    V( prnl( "rocksdb_open() failed: `%s`", err ) );
+    L( log_error( "rocksdb_open() failed: `%s`", err ) );
     rocksdb_options_destroy( db->options );
     rocksdb_mergeoperator_destroy( db->mergeop );
     rocksdb_writeoptions_destroy( db->writeoptions );
@@ -878,7 +878,7 @@ db_t* blb_rocksdb_open( const blb_rocksdb_config_t* c ) {
     return ( NULL );
   }
 
-  V( prnl( "rocksdb at %p", db ) );
+  V( log_debug( "rocksdb at %p", db ) );
 
   return ( ( db_t* )db );
 }

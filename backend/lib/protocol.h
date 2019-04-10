@@ -116,4 +116,6 @@ void blb_protocol_dump_stream_teardown( protocol_dump_stream_t* stream );
 int blb_protocol_dump_stream_decode(
     protocol_dump_stream_t* stream, protocol_entry_t* entry );
 
+void blb_protocol_log_entry( const protocol_entry_t* entry );
+
 #endif

@@ -100,13 +100,13 @@ int main( int argc, char** argv ) {
 
   db_t* db = blb_rocksdb_open( &config );
   if( db == NULL ) {
-    V( prnl( "unable to open rocksdb at path `%s`", config.path ) );
+    L( log_error( "unable to open rocksdb at path `%s`", config.path ) );
     return ( 1 );
   }
 
   engine_t* e = blb_engine_new( db, host, port, thread_throttle_limit );
   if( e == NULL ) {
-    V( prnl( "unable to create engine" ) );
+    L( log_error( "unable to create engine" ) );
     blb_dbi_teardown( db );
     return ( 1 );
   }

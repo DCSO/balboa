@@ -53,14 +53,15 @@ static ssize_t dump_process( state_t* state, FILE* is ) {
     case 0: {
       int rc = state->dump_entry_cb( state, &entry );
       if( rc != 0 ) {
-        L( prnl( "dump_entry_cb() failed with `%d`", rc ) );
+        L( log_error( "dump_entry_cb() failed with `%d`", rc ) );
         return ( -entries );
       }
+      entries++;
       continue;
     }
     case -1: return ( entries );
     default:
-      L( prnl( "blb_dump_stream_decode() failed" ) );
+      L( log_error( "blb_dump_stream_decode() failed with `%d`", rc ) );
       return ( -entries );
     }
   }
@@ -70,7 +71,7 @@ static ssize_t dump_process( state_t* state, FILE* is ) {
 static int dump( state_t* state, const char* dump_file ) {
   ASSERT( state != NULL );
   ASSERT( state->dump_entry_cb != NULL );
-  V( prnl( "dump file is `%s`", dump_file ) );
+  V( log_info( "dump file is `%s`", dump_file ) );
   FILE* f = NULL;
   if( strcmp( dump_file, "-" ) == 0 ) {
     f = stdin;
@@ -78,11 +79,11 @@ static int dump( state_t* state, const char* dump_file ) {
     f = fopen( dump_file, "rb" );
   }
   if( f == NULL ) {
-    L( prnl( "unable to open file `%s`", dump_file ) );
+    L( log_error( "unable to open file `%s`", dump_file ) );
     return ( -1 );
   }
   ssize_t rc = dump_process( state, f );
-  L( prnl( "done; processed `%zd` entries", rc ) );
+  L( log_info( "done; processed `%zd` entries", rc ) );
   dump_state_teardown( state );
   fclose( f );
   if( rc < 0 ) {
@@ -138,7 +139,7 @@ static int dump_entry_replay_cb( state_t* state, protocol_entry_t* entry ) {
   ssize_t rc = blb_protocol_encode_input_request(
       &input, ( char* )state->scrtch0, state->scrtch0_sz );
   if( rc <= 0 ) {
-    L( prnl( "unable to encode input request" ) );
+    L( log_error( "unable to encode input request" ) );
     return ( -1 );
   }
 
@@ -147,7 +148,7 @@ static int dump_entry_replay_cb( state_t* state, protocol_entry_t* entry ) {
   while( r > 0 ) {
     ssize_t rc = write( state->sock, p, r );
     if( rc < 0 ) {
-      L( prnl( "write() failed error `%s`", strerror( errno ) ) );
+      L( log_error( "write() failed with `%s`", strerror( errno ) ) );
       return ( -1 );
     } else if( rc == 0 && errno == EINTR ) {
       continue;
@@ -179,12 +180,12 @@ static int main_jsonize( int argc, char** argv ) {
   theTrace_stream_use( &trace_config );
   theTrace_set_verbosity( verbosity );
 
-  V( prnl( "dump file is `%s`", dump_file ) );
+  V( log_info( "dump file is `%s`", dump_file ) );
 
   state_t __state = {0}, *state = &__state;
   int state_ok = dump_state_init( state );
   if( state_ok != 0 ) {
-    L( prnl( "unable to initialize the dump state\n" ) );
+    L( log_error( "unable to initialize the dump state" ) );
     return ( -1 );
   }
   state->os = stdout;
@@ -258,7 +259,7 @@ lz4cat /tmp/pdns.dmp.lz4 | balboa-backend-console jsonize\n\
 static int main_dump( int argc, char** argv ) {
   const char* host = "127.0.0.1";
   const char* port = "4242";
-  const char* remote_dump_path = "-";
+  const char* dump_path_hint = "-";
   trace_config_t trace_config = {.stream = stderr,
                                  .host = "pdns",
                                  .app = "balboa-backend-console",
@@ -271,7 +272,7 @@ static int main_dump( int argc, char** argv ) {
     case 'h': host = opt.arg; break;
     case 'p': port = opt.arg; break;
     case 'v': verbosity += 1; break;
-    case 'd': remote_dump_path = opt.arg; break;
+    case 'd': dump_path_hint = opt.arg; break;
     default: break;
     }
   }
@@ -279,23 +280,23 @@ static int main_dump( int argc, char** argv ) {
   theTrace_stream_use( &trace_config );
   theTrace_set_verbosity( verbosity );
 
-  V( prnl(
-      "host `%s` port `%s` remote_dump_path `%s`",
+  V( log_info(
+      "host `%s` port `%s` dump_path_hint `%s`",
       host,
       port,
-      remote_dump_path ) );
+      dump_path_hint ) );
   int sock = dump_connect( host, port );
   if( sock < 0 ) {
-    L( prnl( "unable to connect to backend" ) );
+    L( log_error( "unable to connect to backend" ) );
     return ( -1 );
   }
 
   char scrtch[1024];
   size_t scrtch_sz = sizeof( scrtch );
-  protocol_dump_request_t req = {.path = remote_dump_path};
+  protocol_dump_request_t req = {.path = dump_path_hint};
   ssize_t used = blb_protocol_encode_dump_request( &req, scrtch, scrtch_sz );
   if( used <= 0 ) {
-    L( prnl( "blb_protocol_encode_dump_request() failed `%zd`", used ) );
+    L( log_error( "blb_protocol_encode_dump_request() failed `%zd`", used ) );
     close( sock );
     return ( -1 );
   }
@@ -304,7 +305,7 @@ static int main_dump( int argc, char** argv ) {
   while( r > 0 ) {
     ssize_t rc = write( sock, p, r );
     if( rc < 0 ) {
-      L( prnl( "write() failed `%s`", strerror( errno ) ) );
+      L( log_error( "write() failed with `%s`", strerror( errno ) ) );
       close( sock );
       return ( -1 );
     } else if( rc == 0 && errno == EINTR ) {
@@ -321,13 +322,13 @@ static int main_dump( int argc, char** argv ) {
       close( sock );
       return ( 0 );
     } else if( rc < 0 ) {
-      L( prnl( "read() failed `%s`", strerror( errno ) ) );
+      L( log_error( "read() failed with `%s`", strerror( errno ) ) );
       close( sock );
       return ( -1 );
     }
     rc = fwrite( scrtch, rc, 1, stdout );
     if( rc != 1 ) {
-      L( prnl( "fwrite() failed `%s`", strerror( errno ) ) );
+      L( log_error( "fwrite() failed with `%s`", strerror( errno ) ) );
       close( sock );
       return ( -1 );
     }
@@ -359,16 +360,17 @@ static int main_replay( int argc, char** argv ) {
   theTrace_stream_use( &trace_config );
   theTrace_set_verbosity( verbosity );
 
-  V( prnl( "host `%s` port `%s` dump_file `%s`", host, port, dump_file ) );
+  V( log_info( "host `%s` port `%s` dump_file `%s`", host, port, dump_file ) );
+
   int sock = dump_connect( host, port );
   if( sock < 0 ) {
-    L( prnl( "unable to connect to backend" ) );
+    L( log_error( "unable to connect to backend" ) );
     return ( -1 );
   }
   state_t __state = {0}, *state = &__state;
   int state_ok = dump_state_init( state );
   if( state_ok != 0 ) {
-    L( prnl( "unable to initialize the dump state" ) );
+    L( log_error( "unable to initialize the dump state" ) );
     return ( -1 );
   }
   state->sock = sock;
