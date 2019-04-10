@@ -48,9 +48,8 @@ int main( int argc, char** argv ) {
   blb_sqlite_config_t config = blb_sqlite_config_init();
   trace_config_t trace_config = {.stream = stderr,
                                  .host = "pdns",
-                                 .app = "balboa-sqlite"
+                                 .app = "balboa-sqlite",
                                  // leaking process number ...
-                                 ,
                                  .procid = getpid()};
 
   ketopt_t opt = KETOPT_INIT;
