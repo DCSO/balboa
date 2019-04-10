@@ -12,7 +12,7 @@ int main( int argc, char** argv ) {
   int daemonize = 0;
   char* host = "127.0.0.1";
   int port = 4242;
-  int thread_throttle_limit = 64;
+  int conn_throttle_limit = 64;
   trace_config_t trace_config = {.stream = stderr,
                                  .host = "pdns",
                                  .app = argv[0],
@@ -27,7 +27,7 @@ int main( int argc, char** argv ) {
     case 'l': host = opt.arg; break;
     case 'p': port = atoi( opt.arg ); break;
     case 'v': verbosity += 1; break;
-    case 'j': thread_throttle_limit = atoi( opt.arg ); break;
+    case 'j': conn_throttle_limit = atoi( opt.arg ); break;
     default: break;
     }
   }
@@ -44,7 +44,7 @@ int main( int argc, char** argv ) {
   db_t* db = blb_mock_open();
   if( db == NULL ) { return ( 1 ); }
 
-  engine_t* e = blb_engine_new( db, host, port, thread_throttle_limit );
+  engine_t* e = blb_engine_new( db, host, port, conn_throttle_limit );
   if( e == NULL ) {
     L( log_error( "unable to create engine" ) );
     blb_dbi_teardown( db );
