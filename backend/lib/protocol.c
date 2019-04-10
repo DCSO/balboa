@@ -462,7 +462,7 @@ static int blb_protocol_decode_query(
         strncmp( key, PROTOCOL_QUERY_REQUEST_QRRNAME_KEY, key_len ) == 0 ) {
       X( log_debug( "got input request rrname" ) );
       q->qrrname_len = mpack_expect_str_buf(
-          rd, stream->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
+          rd, stream->scrtch[w], PROTOCOL_SCRTCH_SZ );
       q->qrrname = stream->scrtch[w];
       w++;
     } else if(
@@ -473,7 +473,7 @@ static int blb_protocol_decode_query(
         strncmp( key, PROTOCOL_QUERY_REQUEST_QRRTYPE_KEY, key_len ) == 0 ) {
       X( log_debug( "got input request rrtype" ) );
       q->qrrtype_len = mpack_expect_str_buf(
-          rd, stream->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
+          rd, stream->scrtch[w], PROTOCOL_SCRTCH_SZ );
       q->qrrtype = stream->scrtch[w];
       w++;
     } else if(
@@ -484,7 +484,7 @@ static int blb_protocol_decode_query(
         strncmp( key, PROTOCOL_QUERY_REQUEST_QRDATA_KEY, key_len ) == 0 ) {
       X( log_debug( "got input request rdata" ) );
       q->qrdata_len = mpack_expect_str_buf(
-          rd, stream->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
+          rd, stream->scrtch[w], PROTOCOL_SCRTCH_SZ );
       q->qrdata = stream->scrtch[w];
       w++;
     } else if(
@@ -495,7 +495,7 @@ static int blb_protocol_decode_query(
         strncmp( key, PROTOCOL_QUERY_REQUEST_QSENSORID_KEY, key_len ) == 0 ) {
       X( log_debug( "got input request sensorid" ) );
       q->qsensorid_len = mpack_expect_str_buf(
-          rd, stream->scrtch[w], ENGINE_THREAD_SCRTCH_SZ );
+          rd, stream->scrtch[w], PROTOCOL_SCRTCH_SZ );
       q->qsensorid = stream->scrtch[w];
       w++;
     } else if(

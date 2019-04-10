@@ -12,16 +12,16 @@
 typedef struct blb_sqlite_t blb_sqlite_t;
 
 static void blb_sqlite_teardown( db_t* _db );
-static db_t* blb_sqlite_thread_init( thread_t* th, db_t* db );
-static void blb_sqlite_thread_deinit( thread_t* th, db_t* db );
-static int blb_sqlite_query( thread_t* th, const protocol_query_request_t* q );
-static int blb_sqlite_input( thread_t* th, const protocol_input_request_t* i );
-static void blb_sqlite_dump( thread_t* th, const protocol_dump_request_t* d );
+static db_t* blb_sqlite_conn_init( conn_t* th, db_t* db );
+static void blb_sqlite_conn_deinit( conn_t* th, db_t* db );
+static int blb_sqlite_query( conn_t* th, const protocol_query_request_t* q );
+static int blb_sqlite_input( conn_t* th, const protocol_input_request_t* i );
+static void blb_sqlite_dump( conn_t* th, const protocol_dump_request_t* d );
 static void blb_sqlite_backup(
-    thread_t* th, const protocol_backup_request_t* b );
+    conn_t* th, const protocol_backup_request_t* b );
 
-static const dbi_t blb_sqlite_dbi = {.thread_init = blb_sqlite_thread_init,
-                                     .thread_deinit = blb_sqlite_thread_deinit,
+static const dbi_t blb_sqlite_dbi = {.thread_init = blb_sqlite_conn_init,
+                                     .thread_deinit = blb_sqlite_conn_deinit,
                                      .teardown = blb_sqlite_teardown,
                                      .query = blb_sqlite_query,
                                      .input = blb_sqlite_input,
@@ -35,12 +35,12 @@ struct blb_sqlite_t {
   sqlite3_stmt* query_stmt;
 };
 
-db_t* blb_sqlite_thread_init( thread_t* th, db_t* db ) {
+db_t* blb_sqlite_conn_init( conn_t* th, db_t* db ) {
   th->usr_ctx = NULL;
   return ( db );
 }
 
-void blb_sqlite_thread_deinit( thread_t* th, db_t* db ) {
+void blb_sqlite_conn_deinit( conn_t* th, db_t* db ) {
   ( void )th;
   ( void )db;
 }
@@ -54,10 +54,10 @@ void blb_sqlite_teardown( db_t* _db ) {
   blb_free( _db );
 }
 
-static int blb_sqlite_query( thread_t* th, const protocol_query_request_t* q ) {
+static int blb_sqlite_query( conn_t* th, const protocol_query_request_t* q ) {
   ( void )q;
 
-  int start_ok = blb_thread_query_stream_start_response( th );
+  int start_ok = blb_conn_query_stream_start_response( th );
   if( start_ok != 0 ) {
     L( log_error( "unable to start query stream response" ) );
     return ( -1 );
@@ -75,13 +75,13 @@ static int blb_sqlite_query( thread_t* th, const protocol_query_request_t* q ) {
   e->count = 23;
   e->first_seen = 15000000;
   e->last_seen = 15001000;
-  int push_ok = blb_thread_query_stream_push_response( th, e );
+  int push_ok = blb_conn_query_stream_push_response( th, e );
   if( push_ok != 0 ) {
     L( log_error( "unable to push query response entry" ) );
     return ( -1 );
   }
 
-  ( void )blb_thread_query_stream_end_response( th );
+  ( void )blb_conn_query_stream_end_response( th );
 
   return ( 0 );
 }
@@ -94,7 +94,7 @@ static int blb_sqlite_query( thread_t* th, const protocol_query_request_t* q ) {
 #define SQLITE_BIND_FIRSTSEEN_IDX ( 6 )
 #define SQLITE_BIND_LASTSEEN_IDX ( 7 )
 
-static int blb_sqlite_input( thread_t* th, const protocol_input_request_t* i ) {
+static int blb_sqlite_input( conn_t* th, const protocol_input_request_t* i ) {
   ASSERT( th->db->dbi == &blb_sqlite_dbi );
   blb_sqlite_t* db = ( blb_sqlite_t* )th->db;
 
@@ -144,14 +144,14 @@ static int blb_sqlite_input( thread_t* th, const protocol_input_request_t* i ) {
 }
 
 static void blb_sqlite_backup(
-    thread_t* th, const protocol_backup_request_t* b ) {
+    conn_t* th, const protocol_backup_request_t* b ) {
   ASSERT( th->db->dbi == &blb_sqlite_dbi );
   // blb_sqlite_t* db=(blb_sqlite_t*)th->db;
 
   X( log_debug( "backup `%.*s`", ( int )b->path_len, b->path ) );
 }
 
-static void blb_sqlite_dump( thread_t* th, const protocol_dump_request_t* d ) {
+static void blb_sqlite_dump( conn_t* th, const protocol_dump_request_t* d ) {
   ASSERT( th->db->dbi == &blb_sqlite_dbi );
   // blb_sqlite_t* db=(blb_sqlite_t*)th->db;
 

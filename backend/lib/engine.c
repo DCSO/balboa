@@ -19,13 +19,13 @@
 #include <protocol.h>
 #include <trace.h>
 
-#define ENGINE_MAX_MESSAGE_SZ ENGINE_THREAD_SCRTCH_SZ
+#define ENGINE_MAX_MESSAGE_SZ ENGINE_CONN_SCRTCH_SZ
 #define ENGINE_MAX_MESSAGE_NODES ( 1024 )
 #define ENGINE_POLL_READ_TIMEOUT ( 60 )
 #define ENGINE_POLL_WRITE_TIMEOUT ( 30 )
 
 static atomic_int blb_engine_stop = ATOMIC_VAR_INIT( 0 );
-static atomic_int blb_thread_cnt = ATOMIC_VAR_INIT( 0 );
+static atomic_int blb_conn_cnt = ATOMIC_VAR_INIT( 0 );
 
 static void blb_engine_request_stop() {
   atomic_fetch_add( &blb_engine_stop, 1 );
@@ -35,16 +35,16 @@ static int blb_engine_poll_stop() {
   return ( atomic_load( &blb_engine_stop ) );
 }
 
-static void blb_thread_cnt_incr() {
-  ( void )atomic_fetch_add( &blb_thread_cnt, 1 );
+static void blb_conn_cnt_incr() {
+  ( void )atomic_fetch_add( &blb_conn_cnt, 1 );
 }
 
-static void blb_thread_cnt_decr() {
-  ( void )atomic_fetch_sub( &blb_thread_cnt, 1 );
+static void blb_conn_cnt_decr() {
+  ( void )atomic_fetch_sub( &blb_conn_cnt, 1 );
 }
 
-static int blb_thread_cnt_get() {
-  return ( atomic_load( &blb_thread_cnt ) );
+static int blb_conn_cnt_get() {
+  return ( atomic_load( &blb_conn_cnt ) );
 }
 
 static inline int blb_engine_poll_write( int fd, int seconds ) {
@@ -93,7 +93,7 @@ timeout_retry:
   return ( 0 );
 }
 
-static int blb_thread_write_all( thread_t* th, char* _p, size_t _p_sz ) {
+static int blb_conn_write_all( conn_t* th, char* _p, size_t _p_sz ) {
   int wr_ok = blb_engine_poll_write( th->fd, ENGINE_POLL_WRITE_TIMEOUT );
   if( wr_ok != 0 ) {
     L( log_error( "blb_engine_poll_write() failed" ) );
@@ -115,23 +115,23 @@ static int blb_thread_write_all( thread_t* th, char* _p, size_t _p_sz ) {
   return ( 0 );
 }
 
-int blb_thread_query_stream_start_response( thread_t* th ) {
+int blb_conn_query_stream_start_response( conn_t* th ) {
   if( blb_engine_poll_stop() > 0 ) {
     L( log_notice( "thread <%04lx> engine stop detected", th->thread ) );
     return ( -1 );
   }
 
   ssize_t used = blb_protocol_encode_stream_start_response(
-      th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
+      th->scrtch_response, ENGINE_CONN_SCRTCH_SZ );
   if( used <= 0 ) {
     L( log_error( "blb_protocol_encode_stream_start_response() failed" ) );
     return ( -1 );
   }
 
-  return ( blb_thread_write_all( th, th->scrtch_response, used ) );
+  return ( blb_conn_write_all( th, th->scrtch_response, used ) );
 }
 
-int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
+int blb_conn_dump_entry( conn_t* th, const protocol_entry_t* entry ) {
   X( log_debug( "dump stream push entry" ) );
   X( blb_protocol_log_entry( entry ) );
 
@@ -141,17 +141,17 @@ int blb_thread_dump_entry( thread_t* th, const protocol_entry_t* entry ) {
   }
 
   ssize_t used = blb_protocol_encode_dump_entry(
-      entry, th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
+      entry, th->scrtch_response, ENGINE_CONN_SCRTCH_SZ );
   if( used <= 0 ) {
     L( log_error( "blb_protocol_encode_dump_entry() failed" ) );
     return ( -1 );
   }
 
-  return ( blb_thread_write_all( th, th->scrtch_response, used ) );
+  return ( blb_conn_write_all( th, th->scrtch_response, used ) );
 }
 
-int blb_thread_query_stream_push_response(
-    thread_t* th, const protocol_entry_t* entry ) {
+int blb_conn_query_stream_push_response(
+    conn_t* th, const protocol_entry_t* entry ) {
   X( log_debug( "query stream push entry" ) );
   X( blb_protocol_log_entry( entry ) );
 
@@ -161,23 +161,23 @@ int blb_thread_query_stream_push_response(
   }
 
   ssize_t used = blb_protocol_encode_stream_entry(
-      entry, th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
+      entry, th->scrtch_response, ENGINE_CONN_SCRTCH_SZ );
   if( used <= 0 ) {
     L( log_error( "blb_protocol_encode_stream_entry() failed" ) );
     return ( -1 );
   }
 
-  return ( blb_thread_write_all( th, th->scrtch_response, used ) );
+  return ( blb_conn_write_all( th, th->scrtch_response, used ) );
 }
 
-int blb_thread_query_stream_end_response( thread_t* th ) {
+int blb_conn_query_stream_end_response( conn_t* th ) {
   if( blb_engine_poll_stop() > 0 ) {
     L( log_error( "thread <%04lx> engine stop detected", th->thread ) );
     return ( -1 );
   }
 
   ssize_t used = blb_protocol_encode_stream_end_response(
-      th->scrtch_response, ENGINE_THREAD_SCRTCH_SZ );
+      th->scrtch_response, ENGINE_CONN_SCRTCH_SZ );
   if( used <= 0 ) {
     L( log_error( "blb_protocol_encode_stream_end_response() failed" ) );
     return ( -1 );
@@ -186,14 +186,14 @@ int blb_thread_query_stream_end_response( thread_t* th ) {
   X( log_debug(
       "blb_protocol_encode_stream_end_response() returned `%zd`", used ) );
 
-  return ( blb_thread_write_all( th, th->scrtch_response, used ) );
+  return ( blb_conn_write_all( th, th->scrtch_response, used ) );
 }
 
-static thread_t* blb_engine_thread_new( engine_t* e, int fd ) {
-  thread_t* th = blb_new( thread_t );
+static conn_t* blb_engine_conn_new( engine_t* e, int fd ) {
+  conn_t* th = blb_new( conn_t );
   if( th == NULL ) { return ( NULL ); }
   th->usr_ctx = NULL;
-  db_t* db = blb_dbi_thread_init( th, e->db );
+  db_t* db = blb_dbi_conn_init( th, e->db );
   if( db == NULL ) {
     blb_free( th );
     return ( NULL );
@@ -204,14 +204,14 @@ static thread_t* blb_engine_thread_new( engine_t* e, int fd ) {
   return ( th );
 }
 
-static void blb_engine_thread_teardown( thread_t* th ) {
-  blb_dbi_thread_deinit( th, th->db );
+static void blb_engine_conn_teardown( conn_t* th ) {
+  blb_dbi_conn_deinit( th, th->db );
   close( th->fd );
   blb_free( th );
 }
 
-static ssize_t blb_thread_read_stream_cb( void* usr, char* p, size_t p_sz ) {
-  thread_t* th = usr;
+static ssize_t blb_conn_read_stream_cb( void* usr, char* p, size_t p_sz ) {
+  conn_t* th = usr;
   int fd_ok = blb_engine_poll_read( th->fd, ENGINE_POLL_READ_TIMEOUT );
   if( fd_ok != 0 ) {
     L( log_error( "engine poll read failed" ) );
@@ -228,20 +228,20 @@ static ssize_t blb_thread_read_stream_cb( void* usr, char* p, size_t p_sz ) {
   return ( rc );
 }
 
-static inline int blb_engine_thread_consume_backup(
-    thread_t* th, const protocol_backup_request_t* backup ) {
+static inline int blb_engine_conn_consume_backup(
+    conn_t* th, const protocol_backup_request_t* backup ) {
   blb_dbi_backup( th, backup );
   return ( 0 );
 }
 
-static inline int blb_engine_thread_consume_dump(
-    thread_t* th, const protocol_dump_request_t* dump ) {
+static inline int blb_engine_conn_consume_dump(
+    conn_t* th, const protocol_dump_request_t* dump ) {
   blb_dbi_dump( th, dump );
   return ( 0 );
 }
 
-static inline int blb_engine_thread_consume_query(
-    thread_t* th, const protocol_query_request_t* query ) {
+static inline int blb_engine_conn_consume_query(
+    conn_t* th, const protocol_query_request_t* query ) {
   int query_ok = blb_dbi_query( th, query );
   if( query_ok != 0 ) {
     L( log_error( "blb_dbi_query() failed" ) );
@@ -250,8 +250,8 @@ static inline int blb_engine_thread_consume_query(
   return ( 0 );
 }
 
-static inline int blb_engine_thread_consume_input(
-    thread_t* th, const protocol_input_request_t* input ) {
+static inline int blb_engine_conn_consume_input(
+    conn_t* th, const protocol_input_request_t* input ) {
   int input_ok = blb_dbi_input( th, input );
   if( input_ok != 0 ) {
     L( log_error( "blb_dbi_input() failed" ) );
@@ -260,32 +260,32 @@ static inline int blb_engine_thread_consume_input(
   return ( 0 );
 }
 
-static inline int blb_engine_thread_consume(
-    thread_t* th, protocol_message_t* msg ) {
+static inline int blb_engine_conn_consume(
+    conn_t* th, protocol_message_t* msg ) {
   switch( msg->ty ) {
   case PROTOCOL_INPUT_REQUEST:
-    return ( blb_engine_thread_consume_input( th, &msg->u.input ) );
+    return ( blb_engine_conn_consume_input( th, &msg->u.input ) );
   case PROTOCOL_BACKUP_REQUEST:
-    return ( blb_engine_thread_consume_backup( th, &msg->u.backup ) );
+    return ( blb_engine_conn_consume_backup( th, &msg->u.backup ) );
   case PROTOCOL_DUMP_REQUEST:
-    return ( blb_engine_thread_consume_dump( th, &msg->u.dump ) );
+    return ( blb_engine_conn_consume_dump( th, &msg->u.dump ) );
   case PROTOCOL_QUERY_REQUEST:
-    return ( blb_engine_thread_consume_query( th, &msg->u.query ) );
+    return ( blb_engine_conn_consume_query( th, &msg->u.query ) );
   default:
     L( log_debug( "invalid message type `%d`", msg->ty ) );
     return ( -1 );
   }
 }
 
-static void* blb_engine_thread_fn( void* usr ) {
+static void* blb_engine_conn_fn( void* usr ) {
   ASSERT( usr != NULL );
-  thread_t* th = usr;
-  blb_thread_cnt_incr();
+  conn_t* th = usr;
+  blb_conn_cnt_incr();
   T( log_info( "new thread is <%04lx>", th->thread ) );
 
   protocol_stream_t* stream = blb_protocol_stream_new(
       th,
-      blb_thread_read_stream_cb,
+      blb_conn_read_stream_cb,
       ENGINE_MAX_MESSAGE_SZ,
       ENGINE_MAX_MESSAGE_NODES );
   if( stream == NULL ) {
@@ -304,20 +304,20 @@ static void* blb_engine_thread_fn( void* usr ) {
       L( log_error( "blb_protocol_stream_decode() failed" ) );
       goto thread_exit;
     }
-    int th_rc = blb_engine_thread_consume( th, &msg );
+    int th_rc = blb_engine_conn_consume( th, &msg );
     if( th_rc != 0 ) { goto thread_exit; }
   }
 
 thread_exit:
   T( log_info( "thread <%04lx> is shutting down", th->thread ) );
   if( stream != NULL ) { blb_protocol_stream_teardown( stream ); }
-  blb_thread_cnt_decr();
-  blb_engine_thread_teardown( th );
+  blb_conn_cnt_decr();
+  blb_engine_conn_teardown( th );
   return ( NULL );
 }
 
 engine_t* blb_engine_new(
-    db_t* db, const char* name, int port, int thread_throttle_limit ) {
+    db_t* db, const char* name, int port, int conn_throttle_limit ) {
   ASSERT( db != NULL );
 
   struct sockaddr_in __ipv4, *ipv4 = &__ipv4;
@@ -355,7 +355,7 @@ engine_t* blb_engine_new(
     return ( NULL );
   }
 
-  e->thread_throttle_limit = thread_throttle_limit;
+  e->conn_throttle_limit = conn_throttle_limit;
   e->db = db;
   e->listen_fd = fd;
 
@@ -426,7 +426,7 @@ void blb_engine_run( engine_t* e ) {
       L( log_notice( "engine stop detected" ) );
       goto teardown;
     }
-    if( blb_thread_cnt_get() >= e->thread_throttle_limit ) {
+    if( blb_conn_cnt_get() >= e->conn_throttle_limit ) {
       sleep( 1 );
       L( log_warn( "thread throttle reached" ) );
       goto timeout_retry;
@@ -449,24 +449,24 @@ void blb_engine_run( engine_t* e ) {
       blb_engine_request_stop();
       goto teardown;
     }
-    thread_t* th = blb_engine_thread_new( e, fd );
+    conn_t* th = blb_engine_conn_new( e, fd );
     if( th == NULL ) {
-      L( log_error( "blb_engine_thread_new() failed" ) );
+      L( log_error( "blb_engine_conn_new() failed" ) );
       blb_engine_request_stop();
       goto teardown;
     }
 
     ( void )pthread_create(
-        &th->thread, &__attr, blb_engine_thread_fn, ( void* )th );
+        &th->thread, &__attr, blb_engine_conn_fn, ( void* )th );
   }
 
 teardown:
 
   pthread_attr_destroy( &__attr );
 
-  while( blb_thread_cnt_get() > 0 ) {
+  while( blb_conn_cnt_get() > 0 ) {
     L( log_warn(
-        "waiting for `%d` thread(s) to finish", blb_thread_cnt_get() ) );
+        "waiting for `%d` thread(s) to finish", blb_conn_cnt_get() ) );
     sleep( 2 );
   }
 
