@@ -698,7 +698,7 @@ int blb_protocol_dump_stream_decode(
       V(log_debug("dump finished; eof reached"));
       return (-1);
     } else {
-      L(log_error("unexpected mpack decode error `%d`", map_ok));
+      L(log_error("mpack decode error `%d`", map_ok));
       return (-2);
     }
   }
