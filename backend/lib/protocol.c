@@ -300,7 +300,7 @@ static int blb_protocol_decode_input(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out ) {
   const char* p = mpack_node_bin_data( payload );
   size_t p_sz = mpack_node_bin_size( payload );
-  T( log_debug( "encoded message len %zu", p_sz ) );
+  X( log_debug( "encoded message len %zu", p_sz ) );
   if( p == NULL || p_sz == 0 ) {
     L( log_error( "invalid message" ) );
     return ( -1 );
@@ -411,7 +411,7 @@ static int blb_protocol_decode_query(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out ) {
   const char* p = mpack_node_bin_data( payload );
   size_t p_sz = mpack_node_bin_size( payload );
-  T( log_debug( "encoded message len %zu", p_sz ) );
+  X( log_debug( "encoded message len %zu", p_sz ) );
   if( p == NULL || p_sz == 0 ) {
     L( log_error( "invalid message" ) );
     return ( -1 );
@@ -531,7 +531,7 @@ static int blb_protocol_decode_backup(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out ) {
   const char* p = mpack_node_bin_data( payload );
   size_t p_sz = mpack_node_bin_size( payload );
-  T( log_debug( "encoded message len %zu", p_sz ) );
+  X( log_debug( "encoded message len %zu", p_sz ) );
   if( p == NULL || p_sz == 0 ) {
     L( log_error( "invalid message" ) );
     return ( -1 );
@@ -588,7 +588,7 @@ static int blb_protocol_decode_dump(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out ) {
   const char* p = mpack_node_bin_data( payload );
   size_t p_sz = mpack_node_bin_size( payload );
-  T( log_debug( "encoded message len %zu", p_sz ) );
+  X( log_debug( "encoded message len %zu", p_sz ) );
   if( p == NULL || p_sz == 0 ) {
     L( log_error( "invalid message" ) );
     return ( -1 );
