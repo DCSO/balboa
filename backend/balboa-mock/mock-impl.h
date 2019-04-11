@@ -11,6 +11,6 @@
 
 #include <engine.h>
 
-db_t* blb_mock_open( void );
+db_t* blb_mock_open(void);
 
 #endif

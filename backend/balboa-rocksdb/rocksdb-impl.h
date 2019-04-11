@@ -23,14 +23,14 @@ struct blb_rocksdb_config_t {
 };
 
 static inline blb_rocksdb_config_t blb_rocksdb_config_init() {
-  return ( ( blb_rocksdb_config_t ){.membudget = 128 * 1024 * 1024,
-                                    .parallelism = 8,
-                                    .max_log_file_size = 10 * 1024 * 1024,
-                                    .max_open_files = 300,
-                                    .keep_log_file_num = 2,
-                                    .path = "/tmp/balboa-rocksdb"} );
+  return ((blb_rocksdb_config_t){.membudget = 128 * 1024 * 1024,
+                                 .parallelism = 8,
+                                 .max_log_file_size = 10 * 1024 * 1024,
+                                 .max_open_files = 300,
+                                 .keep_log_file_num = 2,
+                                 .path = "/tmp/balboa-rocksdb"});
 }
 
-db_t* blb_rocksdb_open( const blb_rocksdb_config_t* config );
+db_t* blb_rocksdb_open(const blb_rocksdb_config_t* config);
 
 #endif

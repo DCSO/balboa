@@ -7,12 +7,12 @@
 #include <trace.h>
 #include <unistd.h>
 
-__attribute__( ( noreturn ) ) void version( void ) {
-  fprintf( stderr, "balboa-rocksdb v2.0.0\n" );
-  exit( 1 );
+__attribute__((noreturn)) void version(void) {
+  fprintf(stderr, "balboa-rocksdb v2.0.0\n");
+  exit(1);
 }
 
-__attribute__( ( noreturn ) ) void usage( const blb_rocksdb_config_t* c ) {
+__attribute__((noreturn)) void usage(const blb_rocksdb_config_t* c) {
   fprintf(
       stderr,
       "\
@@ -42,11 +42,11 @@ Usage: balboa-rocksdb [options]\n\
       c->parallelism,
       c->max_log_file_size,
       c->max_open_files,
-      c->keep_log_file_num );
-  exit( 1 );
+      c->keep_log_file_num);
+  exit(1);
 }
 
-int main( int argc, char** argv ) {
+int main(int argc, char** argv) {
   int verbosity = 0;
   int daemonize = 0;
   char* host = "127.0.0.1";
@@ -69,53 +69,53 @@ int main( int argc, char** argv ) {
       {"version", ko_no_argument, 307},
       {NULL, 0, 0}};
   int c;
-  while( ( c = ketopt( &opt, argc, argv, 1, "j:d:l:p:vDh", opts ) ) >= 0 ) {
-    switch( c ) {
+  while((c = ketopt(&opt, argc, argv, 1, "j:d:l:p:vDh", opts)) >= 0) {
+    switch(c) {
     case 'D': daemonize = 1; break;
     case 'd': config.path = opt.arg; break;
     case 'l': host = opt.arg; break;
-    case 'p': port = atoi( opt.arg ); break;
+    case 'p': port = atoi(opt.arg); break;
     case 'v': verbosity += 1; break;
-    case 'j': conn_throttle_limit = atoi( opt.arg ); break;
-    case 'h': usage( &config );
-    case 301: config.membudget = atoll( opt.arg ); break;
-    case 302: config.parallelism = atoi( opt.arg ); break;
-    case 303: config.max_log_file_size = atoi( opt.arg ); break;
-    case 304: config.max_open_files = atoi( opt.arg ); break;
-    case 305: config.keep_log_file_num = atoi( opt.arg ); break;
+    case 'j': conn_throttle_limit = atoi(opt.arg); break;
+    case 'h': usage(&config);
+    case 301: config.membudget = atoll(opt.arg); break;
+    case 302: config.parallelism = atoi(opt.arg); break;
+    case 303: config.max_log_file_size = atoi(opt.arg); break;
+    case 304: config.max_open_files = atoi(opt.arg); break;
+    case 305: config.keep_log_file_num = atoi(opt.arg); break;
     case 306: config.path = opt.arg; break;
     case 307: version();
-    default: usage( &config );
+    default: usage(&config);
     }
   }
 
-  theTrace_stream_use( &trace_config );
-  if( daemonize ) {
-    theTrace_set_verbosity( 0 );
+  theTrace_stream_use(&trace_config);
+  if(daemonize) {
+    theTrace_set_verbosity(0);
   } else {
-    theTrace_set_verbosity( verbosity );
+    theTrace_set_verbosity(verbosity);
   }
 
   blb_engine_signals_init();
 
-  db_t* db = blb_rocksdb_open( &config );
-  if( db == NULL ) {
-    L( log_error( "unable to open rocksdb at path `%s`", config.path ) );
-    return ( 1 );
+  db_t* db = blb_rocksdb_open(&config);
+  if(db == NULL) {
+    L(log_error("unable to open rocksdb at path `%s`", config.path));
+    return (1);
   }
 
-  engine_t* e = blb_engine_new( db, host, port, conn_throttle_limit );
-  if( e == NULL ) {
-    L( log_error( "unable to create engine" ) );
-    blb_dbi_teardown( db );
-    return ( 1 );
+  engine_t* e = blb_engine_new(db, host, port, conn_throttle_limit);
+  if(e == NULL) {
+    L(log_error("unable to create engine"));
+    blb_dbi_teardown(db);
+    return (1);
   }
 
-  blb_engine_run( e );
+  blb_engine_run(e);
 
-  blb_engine_teardown( e );
+  blb_engine_teardown(e);
 
-  blb_dbi_teardown( db );
+  blb_dbi_teardown(db);
 
-  return ( 0 );
+  return (0);
 }

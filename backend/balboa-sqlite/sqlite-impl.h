@@ -19,13 +19,13 @@ struct blb_sqlite_config_t {
   const char* journal_mode;
 };
 
-static inline blb_sqlite_config_t blb_sqlite_config_init( void ) {
-  return ( ( blb_sqlite_config_t ){.path = "/tmp/balboa-sqlite.db",
-                                   .name = "pdns",
-                                   .compression = "none",
-                                   .journal_mode = "wal"} );
+static inline blb_sqlite_config_t blb_sqlite_config_init(void) {
+  return ((blb_sqlite_config_t){.path = "/tmp/balboa-sqlite.db",
+                                .name = "pdns",
+                                .compression = "none",
+                                .journal_mode = "wal"});
 }
 
-db_t* blb_sqlite_open( const blb_sqlite_config_t* config );
+db_t* blb_sqlite_open(const blb_sqlite_config_t* config);
 
 #endif
