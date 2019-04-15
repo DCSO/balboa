@@ -69,6 +69,33 @@ func (enc *Encoder) Release() {
 	enc.enc.Release()
 }
 
+func MakeEncoder() *Encoder {
+	inner := new(bytes.Buffer)
+	outer := new(bytes.Buffer)
+	h := new(codec.MsgpackHandle)
+	h.ExplicitRelease = true
+	h.WriteExt = true
+	enc := codec.NewEncoder(inner, h)
+	return &Encoder{inner: inner, outer: outer, enc: enc}
+}
+
+func MakeDecoder(conn net.Conn) *Decoder {
+	outer_h := new(codec.MsgpackHandle)
+	outer_h.ExplicitRelease = true
+	outer_h.WriteExt = true
+	outer_dec := codec.NewDecoder(conn, outer_h)
+	inner_h := new(codec.MsgpackHandle)
+	inner_h.ExplicitRelease = true
+	inner_h.WriteExt = true
+	inner_dec := codec.NewDecoder(new(bytes.Buffer), inner_h)
+	return &Decoder{inner_dec: inner_dec, outer_dec: outer_dec, conn: conn}
+}
+
+func (dec *Decoder) Release() {
+	dec.inner_dec.Release()
+	dec.outer_dec.Release()
+}
+
 func (dec *Decoder) ExpectQueryResponse() (*QueryResponse, error) {
 	msg, msg_err := dec.ExpectTypedMessage()
 	if msg_err != nil {

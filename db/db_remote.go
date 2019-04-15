@@ -4,14 +4,12 @@
 package db
 
 import (
-	"bytes"
 	"errors"
 	"net"
 
 	obs "github.com/DCSO/balboa/observation"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/ugorji/go/codec"
 )
 
 type RemoteBackend struct {
@@ -26,33 +24,6 @@ func MakeRemoteBackend(host string, refill bool) (*RemoteBackend, error) {
 func (db *RemoteBackend) AddObservation(o obs.InputObservation) obs.Observation {
 	log.Warn("AddObservation() not implemented")
 	return obs.Observation{}
-}
-
-func MakeEncoder() *Encoder {
-	inner := new(bytes.Buffer)
-	outer := new(bytes.Buffer)
-	h := new(codec.MsgpackHandle)
-	h.ExplicitRelease = true
-	h.WriteExt = true
-	enc := codec.NewEncoder(inner, h)
-	return &Encoder{inner: inner, outer: outer, enc: enc}
-}
-
-func MakeDecoder(conn net.Conn) *Decoder {
-	outer_h := new(codec.MsgpackHandle)
-	outer_h.ExplicitRelease = true
-	outer_h.WriteExt = true
-	outer_dec := codec.NewDecoder(conn, outer_h)
-	inner_h := new(codec.MsgpackHandle)
-	inner_h.ExplicitRelease = true
-	inner_h.WriteExt = true
-	inner_dec := codec.NewDecoder(new(bytes.Buffer), inner_h)
-	return &Decoder{inner_dec: inner_dec, outer_dec: outer_dec, conn: conn}
-}
-
-func (dec *Decoder) Release() {
-	dec.inner_dec.Release()
-	dec.outer_dec.Release()
 }
 
 func (db *RemoteBackend) Backup(path string) {
