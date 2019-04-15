@@ -55,6 +55,6 @@ $(target-balboa-rocksdb-y): $(OUT)build $(src-balboa-rocksdb-y) $(hdr-balboa-roc
 	$(CC) $(CFLAGS) $(src-balboa-rocksdb-y) -o $(target-balboa-rocksdb-y) $(LDFLAGS)
 
 clean:
-	rm $(target-balboa-rocksdb-y)
-	rm $(OUT)build
+	rm -f $(target-balboa-rocksdb-y)
+	rm -f $(OUT)build
 	rmdir $(OUT)

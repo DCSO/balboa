@@ -27,11 +27,11 @@ MAKEFLAGS+=--no-print-directory
 CC=$(CROSS_PREFIX)$(CCOMPILER)
 
 hdr-balboa-mock=engine.h trace.h daemon.h
-hdr-balboa-mock-y=$(addprefix ../lib/,$(hdr-balboa-mock)) mock.h mpack-config.h
+hdr-balboa-mock-y=$(addprefix ../lib/,$(hdr-balboa-mock)) mock-impl.h mpack-config.h
 
 src-balboa-mock=trace.c daemon.c protocol.c mpack.c engine.c
 src-balboa-mock-y=$(addprefix ../lib/,$(src-balboa-mock))
-src-balboa-mock-y+=mock.c main.c
+src-balboa-mock-y+=mock-impl.c main.c
 
 target-balboa-mock-y=$(OUT)$(CROSS_PREFIX)balboa-mock
 
@@ -48,6 +48,6 @@ $(target-balboa-mock-y): $(OUT)build $(src-balboa-mock-y) $(hdr-balboa-mock-y) M
 	$(CC) $(CFLAGS) $(src-balboa-mock-y) -o $(target-balboa-mock-y) $(LDFLAGS)
 
 clean:
-	rm $(target-balboa-mock-y)
-	rm $(OUT)build
+	rm -f $(target-balboa-mock-y)
+	rm -f $(OUT)build
 	rmdir $(OUT)

@@ -51,6 +51,6 @@ $(target-sqlite-y): $(OUT)build $(src-sqlite-y) $(hdr-sqlite-y) mpack-config.h M
 	$(CC) $(CFLAGS) $(src-sqlite-y) -o $(target-sqlite-y) $(LDFLAGS)
 
 clean:
-	rm $(target-sqlite-y)
-	rm $(OUT)build
+	rm -f $(target-sqlite-y)
+	rm -f $(OUT)build
 	rmdir $(OUT)

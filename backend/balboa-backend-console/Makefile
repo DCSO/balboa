@@ -46,6 +46,6 @@ $(target-console-read-y): Makefile $(OUT)build $(src-console-read-y) $(hdr-lib-y
 	$(CC) $(CFLAGS) $(src-console-read-y) -o $(target-console-read-y) $(LDFLAGS)
 
 clean:
-	rm $(target-console-read-y)
-	rm $(OUT)build
+	rm -f $(target-console-read-y)
+	rm -f $(OUT)build
 	rmdir $(OUT)

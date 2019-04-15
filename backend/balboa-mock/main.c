@@ -3,7 +3,7 @@
 
 #include <engine.h>
 #include <ketopt.h>
-#include <mock.h>
+#include <mock-impl.h>
 #include <trace.h>
 #include <unistd.h>
 
