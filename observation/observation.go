@@ -4,8 +4,8 @@
 package observation
 
 import (
-	"time"
 	uuid "github.com/satori/go.uuid"
+	"time"
 )
 
 // Observation represents a DNS answer, potentially repeated, observed on a

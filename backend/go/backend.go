@@ -62,7 +62,7 @@ func handle(conn net.Conn, h Handler, stopCh chan bool, wg *sync.WaitGroup) {
 					log.Warnf("unable to decode inner message: query request")
 					return
 				}
-				h.HandleQuery(inner,conn)
+				h.HandleQuery(inner, conn)
 			case db.TypeBackupRequest:
 				log.Debugf("got backup request")
 				inner, err_inner := dec.ExpectBackupRequestFromBytes(msg.EncodedMessage)
