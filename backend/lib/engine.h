@@ -85,6 +85,7 @@ engine_t* blb_engine_new(
     db_t* db, const char* name, int port, int conn_throttle_limit);
 void blb_engine_teardown(engine_t* e);
 void blb_engine_run(engine_t* e);
+void blb_engine_request_stop(void);
 
 int blb_conn_query_stream_start_response(conn_t* th);
 int blb_conn_query_stream_push_response(conn_t*, const protocol_entry_t* entry);

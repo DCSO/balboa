@@ -27,7 +27,7 @@
 static atomic_int blb_engine_stop = ATOMIC_VAR_INIT(0);
 static atomic_int blb_conn_cnt = ATOMIC_VAR_INIT(0);
 
-static void blb_engine_request_stop() {
+void blb_engine_request_stop() {
   atomic_fetch_add(&blb_engine_stop, 1);
 }
 
