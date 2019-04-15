@@ -631,6 +631,42 @@ decode_error:
   return (-1);
 }
 
+static int blb_protocol_decode_stream_start(
+    protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
+  const char* p = mpack_node_bin_data(payload);
+  size_t p_sz = mpack_node_bin_size(payload);
+  X(log_debug("encoded message len %zu", p_sz));
+  if(p != NULL || p_sz != 0) {
+    L(log_error("invalid message"));
+    return (-1);
+  }
+  (void)stream;
+  out->ty = PROTOCOL_QUERY_STREAM_START_RESPONSE;
+  return (0);
+}
+
+static int blb_protocol_decode_stream_end(
+    protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
+  const char* p = mpack_node_bin_data(payload);
+  size_t p_sz = mpack_node_bin_size(payload);
+  X(log_debug("encoded message len %zu", p_sz));
+  if(p != NULL || p_sz != 0) {
+    L(log_error("invalid message"));
+    return (-1);
+  }
+  (void)stream;
+  out->ty = PROTOCOL_QUERY_STREAM_END_RESPONSE;
+  return (0);
+}
+
+static int blb_protocol_decode_stream_data(
+    protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
+  int rc = blb_protocol_decode_input(stream, payload, out);
+  if( rc != 0 ) { return (rc); }
+  out->ty = PROTOCOL_QUERY_STREAM_DATA_RESPONSE;
+  return (0);
+}
+
 int blb_protocol_stream_decode(
     protocol_stream_t* stream, protocol_message_t* out) {
   mpack_tree_t* tree = &stream->tree;
@@ -672,6 +708,15 @@ int blb_protocol_stream_decode(
   case PROTOCOL_DUMP_REQUEST:
     X(log_debug("got dump request"));
     return (blb_protocol_decode_dump(stream, payload, out));
+  case PROTOCOL_QUERY_STREAM_START_RESPONSE:
+    X(log_debug("got stream start response"));
+    return (blb_protocol_decode_stream_start(stream, payload, out));
+  case PROTOCOL_QUERY_STREAM_END_RESPONSE:
+    X(log_debug("got stream end response"));
+    return (blb_protocol_decode_stream_end(stream, payload, out));
+  case PROTOCOL_QUERY_STREAM_DATA_RESPONSE:
+    X(log_debug("got stream data response"));
+    return (blb_protocol_decode_stream_data(stream, payload, out));
   default: L(log_error("invalid message type")); return (-1);
   }
 }
