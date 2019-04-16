@@ -132,8 +132,8 @@ int blb_conn_query_stream_start_response(conn_t* th) {
 }
 
 int blb_conn_dump_entry(conn_t* th, const protocol_entry_t* entry) {
-  X(log_debug("dump stream push entry"));
-  X(blb_protocol_log_entry(entry));
+  T(log_debug("dump stream push entry"));
+  T(blb_protocol_log_entry(entry));
 
   if(blb_engine_poll_stop() > 0) {
     L(log_notice("thread <%04lx> engine stop detected", th->thread));
@@ -152,8 +152,8 @@ int blb_conn_dump_entry(conn_t* th, const protocol_entry_t* entry) {
 
 int blb_conn_query_stream_push_response(
     conn_t* th, const protocol_entry_t* entry) {
-  X(log_debug("query stream push entry"));
-  X(blb_protocol_log_entry(entry));
+  T(log_debug("query stream push entry"));
+  T(blb_protocol_log_entry(entry));
 
   if(blb_engine_poll_stop() > 0) {
     L(log_notice("thread <%04lx> engine stop detected", th->thread));
@@ -252,6 +252,7 @@ static inline int blb_engine_conn_consume_query(
 
 static inline int blb_engine_conn_consume_input(
     conn_t* th, const protocol_input_request_t* input) {
+  T(blb_protocol_log_entry(&input->entry));
   int input_ok = blb_dbi_input(th, input);
   if(input_ok != 0) {
     L(log_error("blb_dbi_input() failed"));
@@ -298,7 +299,11 @@ static void* blb_engine_conn_fn(void* usr) {
     }
     int rc = blb_protocol_stream_decode(stream, &msg);
     if(rc != 0) {
-      L(log_error("blb_protocol_stream_decode() failed"));
+      if( rc == -1 ){
+        X(log_debug("blb_protocol_stream_decode() eof"));
+      } else {
+        L(log_error("blb_protocol_stream_decode() failed"));
+      }
       goto thread_exit;
     }
     int th_rc = blb_engine_conn_consume(th, &msg);

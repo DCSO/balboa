@@ -671,7 +671,11 @@ int blb_protocol_stream_decode(
     protocol_stream_t* stream, protocol_message_t* out) {
   mpack_tree_t* tree = &stream->tree;
   mpack_tree_parse(tree);
-  if(mpack_tree_error(tree) != mpack_ok) { return (-1); }
+  switch(mpack_tree_error(tree)) {
+    case mpack_ok: break;
+    case mpack_error_eof: return (-1);
+    default: return (-2);
+  }
 
   mpack_node_t root = mpack_tree_root(tree);
   WHEN_X {

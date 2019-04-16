@@ -142,7 +142,11 @@ static char* blb_rocksdb_merge_fully(
     if(buf == NULL) { return (NULL); }
     for(int i = 0; i < num_operands; i++) {
       value_t nobs = {0, 0, 0};
-      blb_rocksdb_val_decode(&nobs, operands_list[i], operands_list_length[i]);
+      int rc = blb_rocksdb_val_decode(&nobs, operands_list[i], operands_list_length[i]);
+      if(rc != 0) {
+        L(log_error("blb_rocksdb_val_decode() failed"));
+        continue;
+      }
       blb_rocksdb_val_merge(obs, &nobs);
     }
     blb_rocksdb_val_encode(obs, buf, buf_length);
@@ -175,7 +179,11 @@ static char* blb_rocksdb_mergeop_full_merge(
   }
   value_t obs = blb_rocksdb_val_init();
   if(key[0] == 'o' && existing_value != NULL) {
-    blb_rocksdb_val_decode(&obs, existing_value, existing_value_length);
+    int rc = blb_rocksdb_val_decode(&obs, existing_value, existing_value_length);
+    if(rc != 0) {
+      L(log_error("blb_rocksdb_val_decode() failed"));
+      return (NULL);
+    }
   }
   char* result = blb_rocksdb_merge_fully(
       state,
@@ -384,7 +392,7 @@ static int blb_rocksdb_query_by_o(
     const char* val = rocksdb_iter_value(it, &val_size);
     int ret = blb_rocksdb_val_decode(&v, val, val_size);
     if(ret != 0) {
-      L(log_error("unable to decode observation value; skipping entry"));
+      L(log_error("blb_rocksdb_val_decode() failed"));
       continue;
     }
 
@@ -559,7 +567,7 @@ static int blb_rocksdb_query_by_i(
     value_t v;
     int ret = blb_rocksdb_val_decode(&v, val, val_size);
     if(ret != 0) {
-      L(log_error("unable to decode observation value; skipping entry"));
+      L(log_error("blb_rocksdb_val_decode() failed"));
       free(val);
       continue;
     }
@@ -732,8 +740,6 @@ static void blb_rocksdb_dump(conn_t* th, const protocol_dump_request_t* d) {
 static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
   ASSERT(th->db->dbi == &blb_rocksdb_dbi);
   blb_rocksdb_t* db = (blb_rocksdb_t*)th->db;
-
-  X(blb_protocol_log_entry(&i->entry));
 
   value_t v = {.count = i->entry.count,
                .first_seen = i->entry.first_seen,
