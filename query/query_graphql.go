@@ -346,7 +346,7 @@ func (r *EntryResolver) TimeFirst() int32 {
 
 // TimeFirstRFC3339 returns first seen time, as RFC 3339 string, of the corresponding entry.
 func (r *EntryResolver) TimeFirstRFC3339() string {
-	return time.Unix(r.entry.FirstSeen.Unix(), 0).Format(time.RFC3339)
+	return r.entry.FirstSeen.Format(time.RFC3339)
 }
 
 // TimeLast returns the last seen timestamp of the corresponding entry.
@@ -356,7 +356,7 @@ func (r *EntryResolver) TimeLast() int32 {
 
 // TimeLastRFC3339 returns last seen time, as RFC 3339 string, of the corresponding entry.
 func (r *EntryResolver) TimeLastRFC3339() string {
-	return time.Unix(r.entry.LastSeen.Unix(), 0).Format(time.RFC3339)
+	return r.entry.LastSeen.Format(time.RFC3339)
 }
 
 // SensorID returns the sensor ID field of the corresponding entry.
