@@ -299,7 +299,7 @@ static void* blb_engine_conn_fn(void* usr) {
     }
     int rc = blb_protocol_stream_decode(stream, &msg);
     if(rc != 0) {
-      if( rc == -1 ){
+      if(rc == -1) {
         X(log_debug("blb_protocol_stream_decode() eof"));
       } else {
         L(log_error("blb_protocol_stream_decode() failed"));

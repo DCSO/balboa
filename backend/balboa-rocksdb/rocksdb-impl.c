@@ -142,7 +142,8 @@ static char* blb_rocksdb_merge_fully(
     if(buf == NULL) { return (NULL); }
     for(int i = 0; i < num_operands; i++) {
       value_t nobs = {0, 0, 0};
-      int rc = blb_rocksdb_val_decode(&nobs, operands_list[i], operands_list_length[i]);
+      int rc = blb_rocksdb_val_decode(
+          &nobs, operands_list[i], operands_list_length[i]);
       if(rc != 0) {
         L(log_error("blb_rocksdb_val_decode() failed"));
         continue;
@@ -179,7 +180,8 @@ static char* blb_rocksdb_mergeop_full_merge(
   }
   value_t obs = blb_rocksdb_val_init();
   if(key[0] == 'o' && existing_value != NULL) {
-    int rc = blb_rocksdb_val_decode(&obs, existing_value, existing_value_length);
+    int rc =
+        blb_rocksdb_val_decode(&obs, existing_value, existing_value_length);
     if(rc != 0) {
       L(log_error("blb_rocksdb_val_decode() failed"));
       return (NULL);
@@ -262,7 +264,7 @@ void blb_rocksdb_teardown(db_t* _db) {
   rocksdb_writeoptions_destroy(db->writeoptions);
   rocksdb_readoptions_destroy(db->readoptions);
   // keeping this causes segfault
-  //rocksdb_options_destroy(db->options);
+  // rocksdb_options_destroy(db->options);
   rocksdb_close(db->db);
   blb_free(db);
 }
@@ -748,7 +750,7 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
   size_t val_len = sizeof(val);
   (void)blb_rocksdb_val_encode(&v, val, val_len);
 
-  (void)snprintf(
+  int key_sz = snprintf(
       db->scrtch_key,
       ROCKSDB_CONN_SCRTCH_SZ,
       "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
@@ -760,8 +762,12 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
       i->entry.rrtype,
       (int)i->entry.rdata_len,
       i->entry.rdata);
+  if(key_sz <= 0 || key_sz >= ROCKSDB_CONN_SCRTCH_SZ) {
+    L(log_error("truncated key"));
+    return (-1);
+  }
 
-  (void)snprintf(
+  int inv_sz = snprintf(
       db->scrtch_inv,
       ROCKSDB_CONN_SCRTCH_SZ,
       "i\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
@@ -773,16 +779,14 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
       i->entry.rrname,
       (int)i->entry.rrtype_len,
       i->entry.rrtype);
+  if(inv_sz <= 0 || inv_sz >= ROCKSDB_CONN_SCRTCH_SZ) {
+    L(log_error("truncated inverted key"));
+    return (-1);
+  }
 
   char* err = NULL;
   rocksdb_merge(
-      db->db,
-      db->writeoptions,
-      db->scrtch_key,
-      strlen(db->scrtch_key),
-      val,
-      val_len,
-      &err);
+      db->db, db->writeoptions, db->scrtch_key, key_sz, val, val_len, &err);
   if(err != NULL) {
     L(log_error("rocksdb_merge() failed: `%s`", err));
     free(err);
@@ -790,14 +794,7 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
   }
 
   // XXX: put vs merge
-  rocksdb_put(
-      db->db,
-      db->writeoptions,
-      db->scrtch_inv,
-      strlen(db->scrtch_inv),
-      "",
-      0,
-      &err);
+  rocksdb_put(db->db, db->writeoptions, db->scrtch_inv, inv_sz, "", 0, &err);
   if(err != NULL) {
     L(log_error("rocksdb_put() failed: `%s`", err));
     free(err);
