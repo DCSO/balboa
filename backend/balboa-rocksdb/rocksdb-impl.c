@@ -414,6 +414,7 @@ static int blb_rocksdb_query_by_o(
   rocksdb_iter_destroy(it);
   (void)blb_conn_query_stream_end_response(th);
   T(log_debug("keys_visited `%zu` keys_hit `%zu`", keys_visited, keys_hit));
+  return (0);
 
 stream_error:
   rocksdb_iter_destroy(it);
