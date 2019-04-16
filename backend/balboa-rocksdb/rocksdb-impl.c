@@ -113,109 +113,88 @@ static inline void blb_rocksdb_val_merge(value_t* lhs, const value_t* rhs) {
 static char* blb_rocksdb_merge_fully(
     void* state,
     const char* key,
-    size_t key_length,
+    size_t key_len,
     value_t* obs,
-    const char* const* operands_list,
-    const size_t* operands_list_length,
-    int num_operands,
+    const char* const* opnds,
+    const size_t* opnds_len,
+    int n_opnds,
     unsigned char* success,
-    size_t* new_value_length) {
+    size_t* new_len) {
   (void)state;
-  if(key_length < 1) {
-    L(log_error("impossible: invalid key `%.*s`", (int)key_length, key));
-    *success = (unsigned char)1;
+  if(key_len < 5) {
+    V(log_warn(
+        "merge called on unknown key `%p` `%s` `%.*s` opnds `%d`",
+        key,
+        key,
+        (int)key_len,
+        key,
+        n_opnds));
+  }
+  // this is an observation value
+  size_t buf_length = sizeof(uint32_t) * 3;
+  char* buf = malloc(buf_length);
+  if(buf == NULL) {
+    *success = (unsigned char)0;
+    *new_len = 0;
     return (NULL);
   }
-  if(key[0] == 'o') {
-    // this is an observation value
-    size_t buf_length = sizeof(uint32_t) * 3;
-    char* buf = malloc(buf_length);
-    if(buf == NULL) { return (NULL); }
-    for(int i = 0; i < num_operands; i++) {
-      value_t nobs = {0, 0, 0};
-      int rc = blb_rocksdb_val_decode(
-          &nobs, operands_list[i], operands_list_length[i]);
-      if(rc != 0) {
-        L(log_error("blb_rocksdb_val_decode() failed"));
-        continue;
-      }
-      blb_rocksdb_val_merge(obs, &nobs);
+  for(int i = 0; i < n_opnds; i++) {
+    value_t nobs = {0, 0, 0};
+    int rc = blb_rocksdb_val_decode(&nobs, opnds[i], opnds_len[i]);
+    if(rc != 0) {
+      L(log_error(
+          "blb_rocksdb_val_decode() failed (key `%.*s` opnd `%d`)",
+          (int)key_len,
+          key,
+          i));
+      continue;
     }
-    blb_rocksdb_val_encode(obs, buf, buf_length);
-    *new_value_length = buf_length;
-    *success = (unsigned char)1;
-    return (buf);
-  } else {
-    L(log_error("impossible: invalid key `%.*s`", (int)key_length, key));
-    *success = (unsigned char)1;
-    return (NULL);
+    blb_rocksdb_val_merge(obs, &nobs);
   }
+  blb_rocksdb_val_encode(obs, buf, buf_length);
+  *new_len = buf_length;
+  *success = (unsigned char)1;
+  return (buf);
 }
 
 static char* blb_rocksdb_mergeop_full_merge(
     void* state,
     const char* key,
-    size_t key_length,
+    size_t key_len,
     const char* existing_value,
     size_t existing_value_length,
-    const char* const* operands_list,
-    const size_t* operands_list_length,
-    int num_operands,
+    const char* const* opnds,
+    const size_t* opnds_len,
+    int n_opnds,
     unsigned char* success,
-    size_t* new_value_length) {
-  (void)state;
-  if(key_length < 1) {
-    L(log_error("impossible: key to short"));
-    *success = (unsigned char)0;
-    return (NULL);
-  }
+    size_t* new_len) {
   value_t obs = blb_rocksdb_val_init();
   if(key[0] == 'o' && existing_value != NULL) {
     int rc =
         blb_rocksdb_val_decode(&obs, existing_value, existing_value_length);
     if(rc != 0) {
       L(log_error("blb_rocksdb_val_decode() failed"));
+      *success = 1;
       return (NULL);
     }
   }
   char* result = blb_rocksdb_merge_fully(
-      state,
-      key,
-      key_length,
-      &obs,
-      operands_list,
-      operands_list_length,
-      num_operands,
-      success,
-      new_value_length);
+      state, key, key_len, &obs, opnds, opnds_len, n_opnds, success, new_len);
   return (result);
 }
 
 static char* blb_rocksdb_mergeop_partial_merge(
     void* state,
     const char* key,
-    size_t key_length,
-    const char* const* operands_list,
-    const size_t* operands_list_length,
-    int num_operands,
+    size_t key_len,
+    const char* const* opnds,
+    const size_t* opnds_len,
+    int n_opnds,
     unsigned char* success,
-    size_t* new_value_length) {
-  if(key_length < 1) {
-    V(log_error("impossible: key too short"));
-    *success = (unsigned char)0;
-    return (NULL);
-  }
+    size_t* new_len) {
   value_t obs = blb_rocksdb_val_init();
   char* result = blb_rocksdb_merge_fully(
-      state,
-      key,
-      key_length,
-      &obs,
-      operands_list,
-      operands_list_length,
-      num_operands,
-      success,
-      new_value_length);
+      state, key, key_len, &obs, opnds, opnds_len, n_opnds, success, new_len);
   return (result);
 }
 
@@ -534,7 +513,7 @@ static int blb_rocksdb_query_by_i(
     }
 
     memset(db->scrtch_key, '\0', ROCKSDB_CONN_SCRTCH_SZ);
-    (void)snprintf(
+    ssize_t fullkey_len = snprintf(
         db->scrtch_key,
         ROCKSDB_CONN_SCRTCH_SZ,
         "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
@@ -547,21 +526,32 @@ static int blb_rocksdb_query_by_i(
         toks[RDATA].tok_len,
         toks[RDATA].tok);
 
-    X(log_debug("full key `%s`", db->scrtch_key));
+    if(fullkey_len <= 0 || fullkey_len >= ROCKSDB_CONN_SCRTCH_SZ) {
+      L(log_error("invalid key `%.*s`", (int)fullkey_len, db->scrtch_key));
+      continue;
+    }
 
-    size_t fullkey_len = strlen(db->scrtch_key);
+    X(log_debug("full key `%.*s`", (int)fullkey_len, db->scrtch_key));
+
     size_t val_size = 0;
     char* val = rocksdb_get(
         db->db, db->readoptions, db->scrtch_key, fullkey_len, &val_size, &err);
     if(val == NULL || err != NULL) {
-      X(log_debug("rocksdb_get() observation not found"));
+      X(log_debug("rocksdb_get() failed with `%s`", err));
+      free(err);
       continue;
     }
 
     value_t v;
     int ret = blb_rocksdb_val_decode(&v, val, val_size);
     if(ret != 0) {
-      L(log_error("blb_rocksdb_val_decode() failed"));
+      L(log_error(
+          "blb_rocksdb_val_decode() failed (key `%.*s` val_ptr `%p` val_sz "
+          "`%zu`)",
+          (int)fullkey_len,
+          db->scrtch_key,
+          val,
+          val_size));
       free(val);
       continue;
     }
@@ -773,6 +763,12 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
       i->entry.rrtype);
   if(inv_sz <= 0 || inv_sz >= ROCKSDB_CONN_SCRTCH_SZ) {
     L(log_error("truncated inverted key"));
+    return (-1);
+  }
+
+  if(inv_sz < 5 || key_sz < 5) {
+    L(log_error(
+        "derived invalid input keys: inv_sz `%d` key_sz `%d`", inv_sz, key_sz));
     return (-1);
   }
 
