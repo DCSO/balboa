@@ -249,14 +249,13 @@ void blb_rocksdb_conn_deinit(conn_t* th, db_t* db) {
 
 void blb_rocksdb_teardown(db_t* _db) {
   ASSERT(_db->dbi == &blb_rocksdb_dbi);
-
   blb_rocksdb_t* db = (blb_rocksdb_t*)_db;
-  rocksdb_close(db->db);
   rocksdb_mergeoperator_destroy(db->mergeop);
   rocksdb_writeoptions_destroy(db->writeoptions);
   rocksdb_readoptions_destroy(db->readoptions);
-  // keeping this causes segfault; rocksdb_close seems to handle dealloc...
-  // rocksdb_options_destroy(db->options);
+  // keeping this causes segfault
+  //rocksdb_options_destroy(db->options);
+  rocksdb_close(db->db);
   blb_free(db);
 }
 
