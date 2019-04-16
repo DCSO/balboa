@@ -33,6 +33,10 @@ struct blb_rocksdb_t {
   rocksdb_writeoptions_t* writeoptions;
   rocksdb_readoptions_t* readoptions;
   rocksdb_mergeoperator_t* mergeop;
+};
+
+typedef struct blb_rocksdb_conn_t blb_rocksdb_conn_t;
+struct blb_rocksdb_conn_t {
   char scrtch_key[ROCKSDB_CONN_SCRTCH_SZ];
   char scrtch_inv[ROCKSDB_CONN_SCRTCH_SZ];
 };
@@ -91,6 +95,12 @@ static inline int blb_rocksdb_val_encode(
   return (0);
 }
 
+static inline blb_rocksdb_conn_t* blb_rocksdb_get_conn(conn_t* conn) {
+  ASSERT(
+      conn->usr_ctx != NULL && conn->usr_ctx_sz == sizeof(blb_rocksdb_conn_t));
+  return ((blb_rocksdb_conn_t*)(conn->usr_ctx));
+}
+
 static inline int blb_rocksdb_val_decode(
     value_t* o, const char* buf, size_t buflen) {
   size_t minlen = sizeof(uint32_t) * 3;
@@ -113,108 +123,88 @@ static inline void blb_rocksdb_val_merge(value_t* lhs, const value_t* rhs) {
 static char* blb_rocksdb_merge_fully(
     void* state,
     const char* key,
-    size_t key_length,
+    size_t key_len,
     value_t* obs,
-    const char* const* operands_list,
-    const size_t* operands_list_length,
-    int num_operands,
+    const char* const* opnds,
+    const size_t* opnds_len,
+    int n_opnds,
     unsigned char* success,
-    size_t* new_value_length) {
+    size_t* new_len) {
   (void)state;
-  if(key_length < 1) {
-    L(log_error("impossible: key too short"));
+  if(key_len < 5) {
+    V(log_warn(
+        "merge called on unknown key `%p` `%s` `%.*s` opnds `%d`",
+        key,
+        key,
+        (int)key_len,
+        key,
+        n_opnds));
+  }
+  // this is an observation value
+  size_t buf_length = sizeof(uint32_t) * 3;
+  char* buf = malloc(buf_length);
+  if(buf == NULL) {
     *success = (unsigned char)0;
+    *new_len = 0;
     return (NULL);
   }
-  if(key[0] == 'i') {
-    L(log_error("impossible: got an inverted key during merge"));
-    // this is an inverted index key with no meaningful value
-    char* res = malloc(sizeof(char) * 1);
-    if(res == NULL) { return (NULL); }
-    *res = '\0';
-    *new_value_length = 1;
-    *success = 1;
-    return (res);
-  } else if(key[0] == 'o') {
-    // this is an observation value
-    size_t buf_length = sizeof(uint32_t) * 3;
-    char* buf = malloc(buf_length);
-    if(buf == NULL) { return (NULL); }
-    for(int i = 0; i < num_operands; i++) {
-      value_t nobs = {0, 0, 0};
-      blb_rocksdb_val_decode(&nobs, operands_list[i], operands_list_length[i]);
-      blb_rocksdb_val_merge(obs, &nobs);
+  for(int i = 0; i < n_opnds; i++) {
+    value_t nobs = {0, 0, 0};
+    int rc = blb_rocksdb_val_decode(&nobs, opnds[i], opnds_len[i]);
+    if(rc != 0) {
+      L(log_error(
+          "blb_rocksdb_val_decode() failed (key `%.*s` opnd `%d`)",
+          (int)key_len,
+          key,
+          i));
+      continue;
     }
-    blb_rocksdb_val_encode(obs, buf, buf_length);
-    *new_value_length = buf_length;
-    *success = (unsigned char)1;
-    return (buf);
-  } else {
-    L(log_error("impossbile: unknown key format encountered"));
-    *success = (unsigned char)0;
-    return (NULL);
+    blb_rocksdb_val_merge(obs, &nobs);
   }
+  blb_rocksdb_val_encode(obs, buf, buf_length);
+  *new_len = buf_length;
+  *success = (unsigned char)1;
+  return (buf);
 }
 
 static char* blb_rocksdb_mergeop_full_merge(
     void* state,
     const char* key,
-    size_t key_length,
+    size_t key_len,
     const char* existing_value,
     size_t existing_value_length,
-    const char* const* operands_list,
-    const size_t* operands_list_length,
-    int num_operands,
+    const char* const* opnds,
+    const size_t* opnds_len,
+    int n_opnds,
     unsigned char* success,
-    size_t* new_value_length) {
-  (void)state;
-  if(key_length < 1) {
-    L(log_error("impossible: key to short"));
-    *success = (unsigned char)0;
-    return (NULL);
-  }
+    size_t* new_len) {
   value_t obs = blb_rocksdb_val_init();
   if(key[0] == 'o' && existing_value != NULL) {
-    blb_rocksdb_val_decode(&obs, existing_value, existing_value_length);
+    int rc =
+        blb_rocksdb_val_decode(&obs, existing_value, existing_value_length);
+    if(rc != 0) {
+      L(log_error("blb_rocksdb_val_decode() failed"));
+      *success = 1;
+      return (NULL);
+    }
   }
   char* result = blb_rocksdb_merge_fully(
-      state,
-      key,
-      key_length,
-      &obs,
-      operands_list,
-      operands_list_length,
-      num_operands,
-      success,
-      new_value_length);
+      state, key, key_len, &obs, opnds, opnds_len, n_opnds, success, new_len);
   return (result);
 }
 
 static char* blb_rocksdb_mergeop_partial_merge(
     void* state,
     const char* key,
-    size_t key_length,
-    const char* const* operands_list,
-    const size_t* operands_list_length,
-    int num_operands,
+    size_t key_len,
+    const char* const* opnds,
+    const size_t* opnds_len,
+    int n_opnds,
     unsigned char* success,
-    size_t* new_value_length) {
-  if(key_length < 1) {
-    V(log_error("impossible: key too short"));
-    *success = (unsigned char)0;
-    return (NULL);
-  }
+    size_t* new_len) {
   value_t obs = blb_rocksdb_val_init();
   char* result = blb_rocksdb_merge_fully(
-      state,
-      key,
-      key_length,
-      &obs,
-      operands_list,
-      operands_list_length,
-      num_operands,
-      success,
-      new_value_length);
+      state, key, key_len, &obs, opnds, opnds_len, n_opnds, success, new_len);
   return (result);
 }
 
@@ -238,37 +228,44 @@ static inline rocksdb_mergeoperator_t* blb_rocksdb_mergeoperator_create() {
 }
 
 db_t* blb_rocksdb_conn_init(conn_t* th, db_t* db) {
-  (void)th;
+  blb_rocksdb_conn_t* conn = blb_new(blb_rocksdb_conn_t);
+  if(conn == NULL) { return (NULL); }
+  th->usr_ctx = conn;
+  th->usr_ctx_sz = sizeof(blb_rocksdb_conn_t);
   return (db);
 }
 
 void blb_rocksdb_conn_deinit(conn_t* th, db_t* db) {
-  (void)th;
-  (void)db;
+  ASSERT(db->dbi == &blb_rocksdb_dbi);
+  ASSERT(th->usr_ctx != NULL && th->usr_ctx_sz == sizeof(blb_rocksdb_conn_t));
+  blb_free(th->usr_ctx);
+  th->usr_ctx = NULL;
+  th->usr_ctx_sz = 0;
 }
 
 void blb_rocksdb_teardown(db_t* _db) {
   ASSERT(_db->dbi == &blb_rocksdb_dbi);
-
   blb_rocksdb_t* db = (blb_rocksdb_t*)_db;
-  rocksdb_close(db->db);
+  L(log_notice("teardown"));
   rocksdb_mergeoperator_destroy(db->mergeop);
   rocksdb_writeoptions_destroy(db->writeoptions);
   rocksdb_readoptions_destroy(db->readoptions);
-  // keeping this causes segfault; rocksdb_close seems to handle dealloc...
+  // keeping this causes segfault
   // rocksdb_options_destroy(db->options);
+  rocksdb_close(db->db);
   blb_free(db);
 }
 
 static int blb_rocksdb_query_by_o(
     conn_t* th, const protocol_query_request_t* q) {
   ASSERT(th->db->dbi == &blb_rocksdb_dbi);
+  blb_rocksdb_conn_t* dbc = blb_rocksdb_get_conn(th);
   blb_rocksdb_t* db = (blb_rocksdb_t*)th->db;
   size_t prefix_len = 0;
   if(q->qsensorid_len > 0) {
     prefix_len = q->qsensorid_len + q->qrrname_len + 4;
     (void)snprintf(
-        db->scrtch_key,
+        dbc->scrtch_key,
         ROCKSDB_CONN_SCRTCH_SZ,
         "o\x1f%.*s\x1f%.*s\x1f",
         (int)q->qrrname_len,
@@ -278,14 +275,14 @@ static int blb_rocksdb_query_by_o(
   } else {
     prefix_len = q->qrrname_len + 3;
     (void)snprintf(
-        db->scrtch_key,
+        dbc->scrtch_key,
         ROCKSDB_CONN_SCRTCH_SZ,
         "o\x1f%.*s\x1f",
         (int)q->qrrname_len,
         q->qrrname);
   }
 
-  X(log_debug("prefix key `%.*s`", (int)prefix_len, db->scrtch_key));
+  X(log_debug("prefix key `%.*s`", (int)prefix_len, dbc->scrtch_key));
 
   int start_ok = blb_conn_query_stream_start_response(th);
   if(start_ok != 0) {
@@ -294,7 +291,7 @@ static int blb_rocksdb_query_by_o(
   }
 
   rocksdb_iterator_t* it = rocksdb_create_iterator(db->db, db->readoptions);
-  rocksdb_iter_seek(it, db->scrtch_key, prefix_len);
+  rocksdb_iter_seek(it, dbc->scrtch_key, prefix_len);
   size_t keys_visited = 0;
   size_t keys_hit = 0;
   for(;
@@ -385,7 +382,7 @@ static int blb_rocksdb_query_by_o(
     const char* val = rocksdb_iter_value(it, &val_size);
     int ret = blb_rocksdb_val_decode(&v, val, val_size);
     if(ret != 0) {
-      L(log_error("unable to decode observation value; skipping entry"));
+      L(log_error("blb_rocksdb_val_decode() failed"));
       continue;
     }
 
@@ -408,9 +405,15 @@ static int blb_rocksdb_query_by_o(
       goto stream_error;
     }
   }
+  char* err = NULL;
+  rocksdb_iter_get_error(it, &err);
+  if(err != NULL) {
+    L(log_error("iterator error `%s`", err));
+    free(err);
+  }
   rocksdb_iter_destroy(it);
   (void)blb_conn_query_stream_end_response(th);
-  return (0);
+  T(log_debug("keys_visited `%zu` keys_hit `%zu`", keys_visited, keys_hit));
 
 stream_error:
   rocksdb_iter_destroy(it);
@@ -420,12 +423,13 @@ stream_error:
 static int blb_rocksdb_query_by_i(
     conn_t* th, const protocol_query_request_t* q) {
   ASSERT(th->db->dbi == &blb_rocksdb_dbi);
+  blb_rocksdb_conn_t* dbc = blb_rocksdb_get_conn(th);
   blb_rocksdb_t* db = (blb_rocksdb_t*)th->db;
   size_t prefix_len = 0;
   if(q->qsensorid_len > 0) {
     prefix_len = q->qrdata_len + q->qsensorid_len + 4;
     (void)snprintf(
-        db->scrtch_inv,
+        dbc->scrtch_inv,
         ROCKSDB_CONN_SCRTCH_SZ,
         "i\x1f%.*s\x1f%.*s\x1f",
         (int)q->qrdata_len,
@@ -435,15 +439,16 @@ static int blb_rocksdb_query_by_i(
   } else {
     prefix_len = q->qrdata_len + 3;
     (void)snprintf(
-        db->scrtch_inv,
+        dbc->scrtch_inv,
         ROCKSDB_CONN_SCRTCH_SZ,
         "i\x1f%.*s\x1f",
         (int)q->qrdata_len,
         q->qrdata);
   }
-  ASSERT(db->scrtch_inv[prefix_len] == '\0');
 
-  X(log_debug("prefix key `%.*s`", (int)prefix_len, db->scrtch_inv));
+  ASSERT(dbc->scrtch_inv[prefix_len] == '\0');
+
+  T(log_debug("prefix key `%.*s`", (int)prefix_len, dbc->scrtch_inv));
 
   int start_ok = blb_conn_query_stream_start_response(th);
   if(start_ok != 0) {
@@ -452,10 +457,10 @@ static int blb_rocksdb_query_by_i(
   }
 
   rocksdb_iterator_t* it = rocksdb_create_iterator(db->db, db->readoptions);
-  rocksdb_iter_seek(it, db->scrtch_inv, prefix_len);
+  rocksdb_iter_seek(it, dbc->scrtch_inv, prefix_len);
   size_t keys_visited = 0;
-  int keys_hit = 0;
-  for(; rocksdb_iter_valid(it) != (unsigned char)0 && keys_hit < q->limit;
+  size_t keys_hit = 0;
+  for(; rocksdb_iter_valid(it) != (unsigned char)0 && keys_hit < (size_t)q->limit;
       rocksdb_iter_next(it)) {
     keys_visited += 1;
     size_t key_len = 0;
@@ -532,9 +537,9 @@ static int blb_rocksdb_query_by_i(
       continue;
     }
 
-    memset(db->scrtch_key, '\0', ROCKSDB_CONN_SCRTCH_SZ);
-    (void)snprintf(
-        db->scrtch_key,
+    memset(dbc->scrtch_key, '\0', ROCKSDB_CONN_SCRTCH_SZ);
+    ssize_t fullkey_len = snprintf(
+        dbc->scrtch_key,
         ROCKSDB_CONN_SCRTCH_SZ,
         "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
         toks[RRNAME].tok_len,
@@ -546,21 +551,32 @@ static int blb_rocksdb_query_by_i(
         toks[RDATA].tok_len,
         toks[RDATA].tok);
 
-    X(log_debug("full key `%s`", db->scrtch_key));
+    if(fullkey_len <= 0 || fullkey_len >= ROCKSDB_CONN_SCRTCH_SZ) {
+      L(log_error("invalid key `%.*s`", (int)fullkey_len, dbc->scrtch_key));
+      continue;
+    }
 
-    size_t fullkey_len = strlen(db->scrtch_key);
+    X(log_debug("full key `%.*s`", (int)fullkey_len, dbc->scrtch_key));
+
     size_t val_size = 0;
     char* val = rocksdb_get(
-        db->db, db->readoptions, db->scrtch_key, fullkey_len, &val_size, &err);
+        db->db, db->readoptions, dbc->scrtch_key, fullkey_len, &val_size, &err);
     if(val == NULL || err != NULL) {
-      X(log_debug("rocksdb_get() observation not found"));
+      X(log_debug("rocksdb_get() failed with `%s`", err));
+      free(err);
       continue;
     }
 
     value_t v;
     int ret = blb_rocksdb_val_decode(&v, val, val_size);
     if(ret != 0) {
-      L(log_error("unable to decode observation value; skipping entry"));
+      L(log_error(
+          "blb_rocksdb_val_decode() failed (key `%.*s` val_ptr `%p` val_sz "
+          "`%zu`)",
+          (int)fullkey_len,
+          dbc->scrtch_key,
+          val,
+          val_size));
       free(val);
       continue;
     }
@@ -585,8 +601,15 @@ static int blb_rocksdb_query_by_i(
       goto stream_error;
     }
   }
+  char* err = NULL;
+  rocksdb_iter_get_error(it, &err);
+  if(err != NULL) {
+    L(log_error("iterator error `%s`", err));
+    free(err);
+  }
   rocksdb_iter_destroy(it);
   (void)blb_conn_query_stream_end_response(th);
+  T(log_debug("keys_visited `%zu` keys_hit `%zu`", keys_visited, keys_hit));
   return (0);
 
 stream_error:
@@ -725,7 +748,10 @@ static void blb_rocksdb_dump(conn_t* th, const protocol_dump_request_t* d) {
 
   char* err = NULL;
   rocksdb_iter_get_error(it, &err);
-  if(err != NULL) { L(log_error("iterator error `%s`", err)); }
+  if(err != NULL) {
+    L(log_error("iterator error `%s`", err));
+    free(err);
+  }
   rocksdb_iter_destroy(it);
   L(log_notice("dumped `%" PRIu64 "` entries", cnt));
 }
@@ -733,9 +759,7 @@ static void blb_rocksdb_dump(conn_t* th, const protocol_dump_request_t* d) {
 static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
   ASSERT(th->db->dbi == &blb_rocksdb_dbi);
   blb_rocksdb_t* db = (blb_rocksdb_t*)th->db;
-
-  X(blb_protocol_log_entry(&i->entry));
-
+  blb_rocksdb_conn_t* dbc = blb_rocksdb_get_conn(th);
   value_t v = {.count = i->entry.count,
                .first_seen = i->entry.first_seen,
                .last_seen = i->entry.last_seen};
@@ -743,8 +767,8 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
   size_t val_len = sizeof(val);
   (void)blb_rocksdb_val_encode(&v, val, val_len);
 
-  (void)snprintf(
-      db->scrtch_key,
+  int key_sz = snprintf(
+      dbc->scrtch_key,
       ROCKSDB_CONN_SCRTCH_SZ,
       "o\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
       (int)i->entry.rrname_len,
@@ -755,9 +779,13 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
       i->entry.rrtype,
       (int)i->entry.rdata_len,
       i->entry.rdata);
+  if(key_sz <= 0 || key_sz >= ROCKSDB_CONN_SCRTCH_SZ) {
+    L(log_error("truncated key"));
+    return (-1);
+  }
 
-  (void)snprintf(
-      db->scrtch_inv,
+  int inv_sz = snprintf(
+      dbc->scrtch_inv,
       ROCKSDB_CONN_SCRTCH_SZ,
       "i\x1f%.*s\x1f%.*s\x1f%.*s\x1f%.*s",
       (int)i->entry.rdata_len,
@@ -768,16 +796,20 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
       i->entry.rrname,
       (int)i->entry.rrtype_len,
       i->entry.rrtype);
+  if(inv_sz <= 0 || inv_sz >= ROCKSDB_CONN_SCRTCH_SZ) {
+    L(log_error("truncated inverted key"));
+    return (-1);
+  }
+
+  if(inv_sz < 5 || key_sz < 5) {
+    L(log_error(
+        "derived invalid input keys: inv_sz `%d` key_sz `%d`", inv_sz, key_sz));
+    return (-1);
+  }
 
   char* err = NULL;
   rocksdb_merge(
-      db->db,
-      db->writeoptions,
-      db->scrtch_key,
-      strlen(db->scrtch_key),
-      val,
-      val_len,
-      &err);
+      db->db, db->writeoptions, dbc->scrtch_key, key_sz, val, val_len, &err);
   if(err != NULL) {
     L(log_error("rocksdb_merge() failed: `%s`", err));
     free(err);
@@ -785,14 +817,7 @@ static int blb_rocksdb_input(conn_t* th, const protocol_input_request_t* i) {
   }
 
   // XXX: put vs merge
-  rocksdb_put(
-      db->db,
-      db->writeoptions,
-      db->scrtch_inv,
-      strlen(db->scrtch_inv),
-      "",
-      0,
-      &err);
+  rocksdb_put(db->db, db->writeoptions, dbc->scrtch_inv, inv_sz, "", 0, &err);
   if(err != NULL) {
     L(log_error("rocksdb_put() failed: `%s`", err));
     free(err);
