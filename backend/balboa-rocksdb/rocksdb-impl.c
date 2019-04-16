@@ -122,20 +122,11 @@ static char* blb_rocksdb_merge_fully(
     size_t* new_value_length) {
   (void)state;
   if(key_length < 1) {
-    L(log_error("impossible: key too short"));
-    *success = (unsigned char)0;
+    L(log_error("impossible: invalid key `%.*s`", (int)key_length, key));
+    *success = (unsigned char)1;
     return (NULL);
   }
-  if(key[0] == 'i') {
-    L(log_error("impossible: got an inverted key during merge"));
-    // this is an inverted index key with no meaningful value
-    char* res = malloc(sizeof(char) * 1);
-    if(res == NULL) { return (NULL); }
-    *res = '\0';
-    *new_value_length = 1;
-    *success = 1;
-    return (res);
-  } else if(key[0] == 'o') {
+  if(key[0] == 'o') {
     // this is an observation value
     size_t buf_length = sizeof(uint32_t) * 3;
     char* buf = malloc(buf_length);
@@ -155,8 +146,8 @@ static char* blb_rocksdb_merge_fully(
     *success = (unsigned char)1;
     return (buf);
   } else {
-    L(log_error("impossbile: unknown key format encountered"));
-    *success = (unsigned char)0;
+    L(log_error("impossible: invalid key `%.*s`", (int)key_length, key));
+    *success = (unsigned char)1;
     return (NULL);
   }
 }
@@ -260,6 +251,7 @@ void blb_rocksdb_conn_deinit(conn_t* th, db_t* db) {
 void blb_rocksdb_teardown(db_t* _db) {
   ASSERT(_db->dbi == &blb_rocksdb_dbi);
   blb_rocksdb_t* db = (blb_rocksdb_t*)_db;
+  L(log_notice("teardown"));
   rocksdb_mergeoperator_destroy(db->mergeop);
   rocksdb_writeoptions_destroy(db->writeoptions);
   rocksdb_readoptions_destroy(db->readoptions);
