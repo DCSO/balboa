@@ -47,6 +47,7 @@ struct conn_t {
   engine_t* engine;
   db_t* db;
   void* usr_ctx;
+  size_t usr_ctx_sz;
   socket_t fd;
   char scrtch_response[ENGINE_CONN_SCRTCH_SZ];
 };

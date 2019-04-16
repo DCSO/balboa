@@ -193,6 +193,7 @@ static conn_t* blb_engine_conn_new(engine_t* e, int fd) {
   conn_t* th = blb_new(conn_t);
   if(th == NULL) { return (NULL); }
   th->usr_ctx = NULL;
+  th->usr_ctx_sz = 0;
   db_t* db = blb_dbi_conn_init(th, e->db);
   if(db == NULL) {
     blb_free(th);
