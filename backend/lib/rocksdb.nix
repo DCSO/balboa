@@ -1,18 +1,18 @@
-{ stdenv, fetchFromGitHub, lib, bzip2, cmake, lz4, snappy, zlib, zstd, enableLite ? false }:
+{ stdenv, fetchFromGitHub, lib, bzip2, cmake, lz4, snappy, zstd, enableLite ? false }:
 
 stdenv.mkDerivation rec {
   name = "rocksdb";
-  version = "5.18.3";
+  version = "6.0.1";
 
   src = fetchFromGitHub {
     owner = "facebook";
     repo = name;
     rev = "v${version}";
-    sha256 = "1v2slmmr1dsgf8z0qcfg1y9x1al96859rg48b66p9nsawczd5zv9";
+    sha256 = "02jmrvr1whc54q44n7qsah9vld2x40z00kxag8s721dgzcsk37sk";
   };
 
   nativeBuildInputs = [ cmake ];
-  buildInputs = [ bzip2 lz4 snappy zlib zstd ];
+  buildInputs = [ bzip2 lz4 snappy zstd ];
 
   cmakeFlags = [
     "-DCMAKE_BUILD_TYPE=Release"
@@ -24,7 +24,7 @@ stdenv.mkDerivation rec {
     "-DWITH_BZ2=1"
     "-DWITH_LZ4=1"
     "-DWITH_SNAPPY=1"
-    "-DWITH_ZLIB=1"
+    "-DWITH_ZLIB=0"
     "-DWITH_ZSTD=1"
     (lib.optional
         (stdenv.hostPlatform.system == "i686-linux"
