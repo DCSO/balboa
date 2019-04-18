@@ -4,10 +4,10 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <signal.h>
-#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,15 +35,15 @@ static int blb_engine_poll_stop() {
   return (atomic_load(&blb_engine_stop));
 }
 
-static void blb_conn_cnt_incr() {
+static void blb_thread_cnt_incr() {
   (void)atomic_fetch_add(&blb_conn_cnt, 1);
 }
 
-static void blb_conn_cnt_decr() {
+static void blb_thread_cnt_decr() {
   (void)atomic_fetch_sub(&blb_conn_cnt, 1);
 }
 
-static int blb_conn_cnt_get() {
+static int blb_thread_cnt_get() {
   return (atomic_load(&blb_conn_cnt));
 }
 
@@ -112,6 +112,7 @@ static int blb_conn_write_all(conn_t* th, char* _p, size_t _p_sz) {
     r -= rc;
     p += rc;
   }
+  blb_engine_stats_add(th->engine, ENGINE_STATS_BYTES_SEND, _p_sz);
   return (0);
 }
 
@@ -220,12 +221,14 @@ static ssize_t blb_conn_read_stream_cb(void* usr, char* p, size_t p_sz) {
   }
   ssize_t rc = read(th->fd, p, p_sz);
   if(rc < 0) {
+    blb_engine_stats_bump(th->engine, ENGINE_STATS_ERRORS);
     L(log_error("read() failed `%s`", strerror(errno)));
     return (-1);
   } else if(rc == 0) {
     X(log_debug("read() eof"));
     return (0);
   }
+  blb_engine_stats_add(th->engine, ENGINE_STATS_BYTES_RECV, rc);
   return (rc);
 }
 
@@ -265,21 +268,28 @@ static inline int blb_engine_conn_consume_input(
 static inline int blb_engine_conn_consume(conn_t* th, protocol_message_t* msg) {
   switch(msg->ty) {
   case PROTOCOL_INPUT_REQUEST:
+    blb_engine_stats_bump(th->engine, ENGINE_STATS_INPUTS);
     return (blb_engine_conn_consume_input(th, &msg->u.input));
   case PROTOCOL_BACKUP_REQUEST:
+    blb_engine_stats_bump(th->engine, ENGINE_STATS_BACKUPS);
     return (blb_engine_conn_consume_backup(th, &msg->u.backup));
   case PROTOCOL_DUMP_REQUEST:
+    blb_engine_stats_bump(th->engine, ENGINE_STATS_DUMPS);
     return (blb_engine_conn_consume_dump(th, &msg->u.dump));
   case PROTOCOL_QUERY_REQUEST:
+    blb_engine_stats_bump(th->engine, ENGINE_STATS_QUERIES);
     return (blb_engine_conn_consume_query(th, &msg->u.query));
-  default: L(log_debug("invalid message type `%d`", msg->ty)); return (-1);
+  default:
+    blb_engine_stats_bump(th->engine, ENGINE_STATS_ERRORS);
+    L(log_debug("invalid message type `%d`", msg->ty));
+    return (-1);
   }
 }
 
 static void* blb_engine_conn_fn(void* usr) {
   ASSERT(usr != NULL);
   conn_t* th = usr;
-  blb_conn_cnt_incr();
+  blb_thread_cnt_incr();
   T(log_info("new thread is <%04lx>", th->thread));
 
   protocol_stream_t* stream = blb_protocol_stream_new(
@@ -309,12 +319,16 @@ static void* blb_engine_conn_fn(void* usr) {
     }
     int th_rc = blb_engine_conn_consume(th, &msg);
     if(th_rc != 0) { goto thread_exit; }
+    if(msg.ty == PROTOCOL_DUMP_REQUEST || msg.ty == PROTOCOL_BACKUP_REQUEST) {
+      V(log_notice("closing client connection after dump or backup request"));
+      goto thread_exit;
+    }
   }
 
 thread_exit:
   T(log_info("thread <%04lx> is shutting down", th->thread));
   if(stream != NULL) { blb_protocol_stream_teardown(stream); }
-  blb_conn_cnt_decr();
+  blb_thread_cnt_decr();
   blb_engine_conn_teardown(th);
   return (NULL);
 }
@@ -361,6 +375,10 @@ engine_t* blb_engine_new(
   e->conn_throttle_limit = conn_throttle_limit;
   e->db = db;
   e->listen_fd = fd;
+  e->stats.interval = 10;
+  for(int i = 0; i < ENGINE_STATS_N; i++) {
+    atomic_store(&e->stats.counters[i], 0);
+  }
 
   V(log_info("listening on host `%s` port `%d` fd `%d`", name, port, fd));
 
@@ -413,9 +431,56 @@ void blb_engine_signals_init(void) {
   pthread_create(&signal_consumer, NULL, blb_engine_signal_consume, NULL);
 }
 
+static inline unsigned long long blb_stats_slurp(
+    engine_stats_t* s, enum engine_stats_counter_t c) {
+  if(c < 0 || c >= ENGINE_STATS_N) { return (ULLONG_MAX); }
+  unsigned long long x = atomic_load(&s->counters[c]);
+  atomic_store(&s->counters[c], 0);
+  return (x);
+}
+
+static void* blb_engine_stats_report(void* usr) {
+  V(log_info("engine stats thread started"));
+  engine_t* e = usr;
+  blb_thread_cnt_incr();
+  pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+  pthread_cond_t c = PTHREAD_COND_INITIALIZER;
+  clock_gettime(CLOCK_REALTIME, &e->stats.last);
+  while(1) {
+    if(blb_engine_poll_stop() > 0) {
+      L(log_notice("engine stats stop detected"));
+      blb_thread_cnt_decr();
+      return (NULL);
+    }
+    (void)pthread_mutex_lock(&m);
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += e->stats.interval;
+    (void)pthread_cond_timedwait(&c, &m, &ts);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    long delta_t = ts.tv_sec - e->stats.last.tv_sec;
+    L(log_notice(
+        "delta_t `%ld` q `%llu` i `%llu` e `%llu` s `%llu` r `%llu` c `%llu`",
+        delta_t,
+        blb_stats_slurp(&e->stats, ENGINE_STATS_QUERIES),
+        blb_stats_slurp(&e->stats, ENGINE_STATS_INPUTS),
+        blb_stats_slurp(&e->stats, ENGINE_STATS_ERRORS),
+        blb_stats_slurp(&e->stats, ENGINE_STATS_BYTES_SEND),
+        blb_stats_slurp(&e->stats, ENGINE_STATS_BYTES_RECV),
+        blb_stats_slurp(&e->stats, ENGINE_STATS_CONNECTIONS)));
+    e->stats.last = ts;
+    (void)pthread_mutex_unlock(&m);
+  }
+  blb_thread_cnt_decr();
+  return (NULL);
+}
+
 void blb_engine_run(engine_t* e) {
   struct sockaddr_in __addr, *addr = &__addr;
   socklen_t addrlen = sizeof(struct sockaddr_in);
+
+  pthread_t stats_reporter;
+  pthread_create(&stats_reporter, NULL, blb_engine_stats_report, e);
 
   pthread_attr_t __attr;
   pthread_attr_init(&__attr);
@@ -429,8 +494,8 @@ void blb_engine_run(engine_t* e) {
       L(log_notice("engine stop detected"));
       goto teardown;
     }
-    if(blb_conn_cnt_get() >= e->conn_throttle_limit) {
-      sleep(1);
+    if(blb_thread_cnt_get() >= e->conn_throttle_limit) {
+      blb_engine_sleep(1);
       L(log_warn("thread throttle reached"));
       goto timeout_retry;
     }
@@ -458,7 +523,7 @@ void blb_engine_run(engine_t* e) {
       blb_engine_request_stop();
       goto teardown;
     }
-
+    blb_engine_stats_bump(th->engine, ENGINE_STATS_CONNECTIONS);
     (void)pthread_create(&th->thread, &__attr, blb_engine_conn_fn, (void*)th);
   }
 
@@ -466,9 +531,9 @@ teardown:
 
   pthread_attr_destroy(&__attr);
 
-  while(blb_conn_cnt_get() > 0) {
-    L(log_warn("waiting for `%d` thread(s) to finish", blb_conn_cnt_get()));
-    sleep(2);
+  while(blb_thread_cnt_get() > 0) {
+    L(log_warn("waiting for `%d` thread(s) to finish", blb_thread_cnt_get()));
+    blb_engine_sleep(2);
   }
 
   L(log_notice("all threads finished"));
