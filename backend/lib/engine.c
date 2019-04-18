@@ -433,7 +433,7 @@ void blb_engine_signals_init(void) {
 
 static inline unsigned long long blb_stats_slurp(
     engine_stats_t* s, enum engine_stats_counter_t c) {
-  if(c < 0 || c > ENGINE_STATS_N) { return (ULLONG_MAX); }
+  if(c < 0 || c >= ENGINE_STATS_N) { return (ULLONG_MAX); }
   unsigned long long x = atomic_load(&s->counters[c]);
   atomic_store(&s->counters[c], 0);
   return (x);

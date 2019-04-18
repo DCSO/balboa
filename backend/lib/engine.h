@@ -116,7 +116,7 @@ static inline void blb_dbi_dump(conn_t* th, const protocol_dump_request_t* d) {
 
 static inline void blb_engine_stats_bump(
     engine_t* engine, enum engine_stats_counter_t counter) {
-  if(counter < 0 || counter > ENGINE_STATS_N) { return; }
+  if(counter < 0 || counter >= ENGINE_STATS_N) { return; }
   atomic_fetch_add(&engine->stats.counters[counter], 1);
 }
 
@@ -124,7 +124,7 @@ static inline void blb_engine_stats_add(
     engine_t* engine,
     enum engine_stats_counter_t counter,
     unsigned long long x) {
-  if(counter < 0 || counter > ENGINE_STATS_N) { return; }
+  if(counter < 0 || counter >= ENGINE_STATS_N) { return; }
   atomic_fetch_add(&engine->stats.counters[counter], x);
 }
 
