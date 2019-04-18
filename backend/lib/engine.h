@@ -8,6 +8,8 @@
 #include <inttypes.h>
 #include <protocol.h>
 #include <pthread.h>
+#include <stdatomic.h>
+#include <time.h>
 #include <trace.h>
 
 #define ENGINE_CONN_SCRTCH_SZ (1024 * 10)
@@ -19,6 +21,7 @@ typedef struct dbi_t dbi_t;
 typedef struct db_t db_t;
 typedef struct engine_t engine_t;
 typedef struct conn_t conn_t;
+typedef struct engine_stats_t engine_stats_t;
 
 #define QUERY_TYPE_DEFAULT 0
 
@@ -36,7 +39,26 @@ struct db_t {
   const dbi_t* dbi;
 };
 
+enum engine_stats_counter_t {
+  ENGINE_STATS_QUERIES = 0,
+  ENGINE_STATS_INPUTS = 1,
+  ENGINE_STATS_BACKUPS = 2,
+  ENGINE_STATS_DUMPS = 3,
+  ENGINE_STATS_BYTES_RECV = 4,
+  ENGINE_STATS_BYTES_SEND = 5,
+  ENGINE_STATS_CONNECTIONS = 6,
+  ENGINE_STATS_ERRORS = 7,
+  ENGINE_STATS_N = 8
+};
+
+struct engine_stats_t {
+  unsigned long interval;
+  struct timespec last;
+  atomic_ullong counters[ENGINE_STATS_N];
+};
+
 struct engine_t {
+  engine_stats_t stats;
   int conn_throttle_limit;
   db_t* db;
   socket_t listen_fd;
@@ -51,6 +73,17 @@ struct conn_t {
   socket_t fd;
   char scrtch_response[ENGINE_CONN_SCRTCH_SZ];
 };
+
+static inline void blb_engine_sleep(long seconds) {
+  pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+  pthread_cond_t c = PTHREAD_COND_INITIALIZER;
+  (void)pthread_mutex_lock(&m);
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += seconds;
+  (void)pthread_cond_timedwait(&c, &m, &ts);
+  (void)pthread_mutex_unlock(&m);
+}
 
 static inline db_t* blb_dbi_conn_init(conn_t* th, db_t* db) {
   return (db->dbi->thread_init(th, db));
@@ -79,6 +112,20 @@ static inline void blb_dbi_backup(
 
 static inline void blb_dbi_dump(conn_t* th, const protocol_dump_request_t* d) {
   th->db->dbi->dump(th, d);
+}
+
+static inline void blb_engine_stats_bump(
+    engine_t* engine, enum engine_stats_counter_t counter) {
+  if(counter < 0 || counter > ENGINE_STATS_N) { return; }
+  atomic_fetch_add(&engine->stats.counters[counter], 1);
+}
+
+static inline void blb_engine_stats_add(
+    engine_t* engine,
+    enum engine_stats_counter_t counter,
+    unsigned long long x) {
+  if(counter < 0 || counter > ENGINE_STATS_N) { return; }
+  atomic_fetch_add(&engine->stats.counters[counter], x);
 }
 
 void blb_engine_signals_init(void);

@@ -19,8 +19,6 @@
 #include <protocol.h>
 #include <trace.h>
 
-static int verbosity = 0;
-
 typedef struct state_t state_t;
 struct state_t {
   uint8_t* scrtch0;
@@ -160,6 +158,7 @@ static int dump_entry_replay_cb(state_t* state, protocol_entry_t* entry) {
 
 static int main_jsonize(int argc, char** argv) {
   const char* dump_file = "-";
+  int verbosity = 0;
   trace_config_t trace_config = {.stream = stderr,
                                  .host = "pdns",
                                  .app = "balboa-backend-console",
@@ -259,6 +258,7 @@ static int main_dump(int argc, char** argv) {
   const char* host = "127.0.0.1";
   const char* port = "4242";
   const char* dump_path_hint = "-";
+  int verbosity = 0;
   trace_config_t trace_config = {.stream = stderr,
                                  .host = "pdns",
                                  .app = "balboa-backend-console",
@@ -266,7 +266,7 @@ static int main_dump(int argc, char** argv) {
                                  .procid = getpid()};
   ketopt_t opt = KETOPT_INIT;
   int c;
-  while((c = ketopt(&opt, argc, argv, 1, "h:p:v:d:", NULL)) >= 0) {
+  while((c = ketopt(&opt, argc, argv, 1, "h:p:d:v", NULL)) >= 0) {
     switch(c) {
     case 'h': host = opt.arg; break;
     case 'p': port = opt.arg; break;
@@ -297,7 +297,7 @@ static int main_dump(int argc, char** argv) {
     return (-1);
   }
   char* p = scrtch;
-  ssize_t r = scrtch_sz;
+  ssize_t r = used;
   while(r > 0) {
     ssize_t rc = write(sock, p, r);
     if(rc < 0) {
@@ -335,6 +335,7 @@ static int main_replay(int argc, char** argv) {
   const char* host = "127.0.0.1";
   const char* port = "4242";
   const char* dump_file = "-";
+  int verbosity = 0;
   trace_config_t trace_config = {.stream = stderr,
                                  .host = "pdns",
                                  .app = "balboa-backend-console",

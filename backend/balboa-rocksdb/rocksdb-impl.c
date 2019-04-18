@@ -461,7 +461,8 @@ static int blb_rocksdb_query_by_i(
   rocksdb_iter_seek(it, dbc->scrtch_inv, prefix_len);
   size_t keys_visited = 0;
   size_t keys_hit = 0;
-  for(; rocksdb_iter_valid(it) != (unsigned char)0 && keys_hit < (size_t)q->limit;
+  for(;
+      rocksdb_iter_valid(it) != (unsigned char)0 && keys_hit < (size_t)q->limit;
       rocksdb_iter_next(it)) {
     keys_visited += 1;
     size_t key_len = 0;
