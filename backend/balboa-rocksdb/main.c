@@ -96,20 +96,21 @@ int main(int argc, char** argv) {
     theTrace_set_verbosity(verbosity);
   }
 
-  blb_engine_signals_init();
-
   db_t* db = blb_rocksdb_open(&config);
   if(db == NULL) {
     L(log_error("unable to open rocksdb at path `%s`", config.path));
     return (1);
   }
 
-  engine_t* e = blb_engine_new(db, host, port, conn_throttle_limit);
+  engine_t* e = blb_engine_server_new(db, host, port, conn_throttle_limit);
   if(e == NULL) {
     L(log_error("unable to create engine"));
     blb_dbi_teardown(db);
     return (1);
   }
+
+  blb_engine_spawn_signal_consumer(e);
+  blb_engine_spawn_stats_reporter(e);
 
   blb_engine_run(e);
 

@@ -158,6 +158,76 @@ static int dump_entry_replay_cb(state_t* state, protocol_entry_t* entry) {
   return (0);
 }
 
+static int main_query(int argc, char** argv) {
+  int verbosity = 0;
+  const char* host = "127.0.0.1";
+  int port = 4242;
+  trace_config_t trace_config = {.stream = stderr,
+                                 .host = "pdns",
+                                 .app = "balboa-backend-console",
+                                 // leaking process number ...
+                                 .procid = getpid()};
+  protocol_query_request_t __query = {0}, *query = &__query;
+  ketopt_t opt = KETOPT_INIT;
+  int c;
+  while((c = ketopt(&opt, argc, argv, 1, "h:p:r:d:s:l:v", NULL)) >= 0) {
+    switch(c) {
+    case 'v': verbosity += 1; break;
+    case 'h': host = opt.arg; break;
+    case 'p': port = atoi(opt.arg); break;
+    default: break;
+    }
+  }
+
+  theTrace_stream_use(&trace_config);
+  theTrace_set_verbosity(verbosity);
+
+  conn_t* conn = blb_engine_client_new(host, port);
+  engine_t* engine = conn->engine;
+
+  ssize_t used = blb_protocol_encode_query_request(
+      query, conn->scrtch, ENGINE_CONN_SCRTCH_SZ);
+  if(used <= 0) {
+    L(log_error("unable to encode query"));
+    blb_engine_teardown(engine);
+    blb_engine_conn_teardown(conn);
+    return (-1);
+  }
+
+  int rc = blb_conn_write_all(conn, conn->scrtch, used);
+  if(rc != 0) {
+    L(log_debug("blb_conn_write_all() failed"));
+    blb_engine_teardown(engine);
+    blb_engine_conn_teardown(conn);
+    return (-1);
+  }
+
+  protocol_stream_t* stream = blb_engine_stream_new(conn);
+  if(stream == NULL) {
+    L(log_error("blb_engine_stream_new() failed"));
+    blb_engine_teardown(engine);
+    blb_engine_conn_teardown(conn);
+    return (-1);
+  }
+
+  while(1) {
+    protocol_message_t msg;
+    int rc = blb_protocol_stream_decode(stream, &msg);
+    if(rc != 0) {
+      L(log_error("blb_protocol_stream_decode() failed"));
+      blb_protocol_stream_teardown(stream);
+      blb_engine_teardown(engine);
+      blb_engine_conn_teardown(conn);
+      return (-1);
+    }
+  }
+
+  blb_protocol_stream_teardown(stream);
+  blb_engine_teardown(engine);
+  blb_engine_conn_teardown(conn);
+  return (0);
+}
+
 static int main_jsonize(int argc, char** argv) {
   const char* dump_file = "-";
   int verbosity = 0;
