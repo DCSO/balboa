@@ -60,9 +60,11 @@ static ssize_t dump_process(state_t* state, FILE* is) {
     case -1: return (entries);
     default:
       L(log_error("blb_dump_stream_decode() failed with `%d`", rc));
+      blb_protocol_dump_stream_teardown(stream);
       return (-entries);
     }
   }
+  blb_protocol_dump_stream_teardown(stream);
   return (entries);
 }
 

@@ -732,7 +732,7 @@ protocol_dump_stream_t* blb_protocol_dump_stream_new(FILE* file) {
   return (stream);
 }
 
-void blb_protocol_dump_stream_treardown(protocol_dump_stream_t* stream) {
+void blb_protocol_dump_stream_teardown(protocol_dump_stream_t* stream) {
   mpack_reader_destroy(&stream->reader);
   blb_free(stream);
 }
