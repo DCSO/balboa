@@ -141,8 +141,8 @@ int blb_conn_dump_entry(conn_t* th, const protocol_entry_t* entry) {
     return (-1);
   }
 
-  ssize_t used = blb_protocol_encode_dump_entry(
-      entry, th->scrtch, ENGINE_CONN_SCRTCH_SZ);
+  ssize_t used =
+      blb_protocol_encode_dump_entry(entry, th->scrtch, ENGINE_CONN_SCRTCH_SZ);
   if(used <= 0) {
     L(log_error("blb_protocol_encode_dump_entry() failed"));
     return (-1);
@@ -196,7 +196,7 @@ static conn_t* blb_engine_conn_new(engine_t* e, int fd) {
   th->usr_ctx = NULL;
   th->usr_ctx_sz = 0;
   th->db = NULL;
-  if( e->db != NULL ) {
+  if(e->db != NULL) {
     db_t* db = blb_dbi_conn_init(th, e->db);
     if(db == NULL) {
       blb_free(th);
@@ -210,9 +210,7 @@ static conn_t* blb_engine_conn_new(engine_t* e, int fd) {
 }
 
 void blb_engine_conn_teardown(conn_t* th) {
-  if( th->db != NULL ) {
-    blb_dbi_conn_deinit(th, th->db);
-  }
+  if(th->db != NULL) { blb_dbi_conn_deinit(th, th->db); }
   close(th->fd);
   blb_free(th);
 }
@@ -343,19 +341,19 @@ thread_exit:
   return (NULL);
 }
 
-engine_t* blb_engine_server_new(
-    db_t* db, const char* name, int port, int conn_throttle_limit) {
-  ASSERT(db != NULL);
+engine_t* blb_engine_server_new(const engine_config_t* config) {
+  ASSERT(config->db != NULL);
+  ASSERT(config->is_server == true);
 
   struct sockaddr_in __ipv4, *ipv4 = &__ipv4;
-  int rc = inet_pton(AF_INET, name, &ipv4->sin_addr);
+  int rc = inet_pton(AF_INET, config->host, &ipv4->sin_addr);
   ASSERT(rc >= 0);
   if(rc != 1) {
     errno = EINVAL;
     return (NULL);
   }
   ipv4->sin_family = AF_INET;
-  ipv4->sin_port = htons((uint16_t)port);
+  ipv4->sin_port = htons((uint16_t)config->port);
   int fd = socket(ipv4->sin_family, SOCK_STREAM, 0);
   if(fd < 0) {
     L(log_error("socket() failed with `%s`", strerror(errno)));
@@ -382,15 +380,21 @@ engine_t* blb_engine_server_new(
     return (NULL);
   }
 
-  e->conn_throttle_limit = conn_throttle_limit;
-  e->db = db;
+  e->conn_throttle_limit = config->conn_throttle_limit;
+  e->enable_signal_consumer = config->enable_signal_consumer;
+  e->enable_stats_reporter = config->enable_stats_reporter;
+  e->db = config->db;
   e->listen_fd = fd;
   e->stats.interval = 10;
   for(int i = 0; i < ENGINE_STATS_N; i++) {
     atomic_store(&e->stats.counters[i], 0);
   }
 
-  V(log_info("listening on host `%s` port `%d` fd `%d`", name, port, fd));
+  V(log_info(
+      "listening on host `%s` port `%d` fd `%d`",
+      config->host,
+      config->port,
+      fd));
 
   return (e);
 }
@@ -412,11 +416,11 @@ static int blb_engine_client_connect(const char* host, int port) {
   return (fd);
 }
 
-conn_t* blb_engine_client_new(const char* host, int port) {
-  int fd = blb_engine_client_connect(host, port);
-  if(fd < 0) {
-    return (NULL);
-  }
+conn_t* blb_engine_client_new(const engine_config_t* config) {
+  ASSERT(config->db == NULL);
+  ASSERT(config->is_server == false);
+  int fd = blb_engine_client_connect(config->host, config->port);
+  if(fd < 0) { return (NULL); }
 
   engine_t* e = blb_new(engine_t);
   if(e == NULL) {
@@ -426,7 +430,7 @@ conn_t* blb_engine_client_new(const char* host, int port) {
   e->db = NULL;
 
   conn_t* c = blb_engine_conn_new(e, fd);
-  if(c == NULL ) {
+  if(c == NULL) {
     L(log_error("blb_engine_conn_new() failed"));
     blb_free(e);
     return (NULL);
@@ -474,7 +478,7 @@ static inline unsigned long long blb_stats_slurp(
 }
 
 static void* blb_engine_stats_report(void* usr) {
-  V(log_info("engine stats thread started"));
+  V(log_info("engine stats reporter thread started"));
   engine_t* e = usr;
   blb_thread_cnt_incr();
   pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
@@ -530,6 +534,10 @@ void blb_engine_spawn_stats_reporter(engine_t* e) {
 void blb_engine_run(engine_t* e) {
   struct sockaddr_in __addr, *addr = &__addr;
   socklen_t addrlen = sizeof(struct sockaddr_in);
+
+  if(e->enable_signal_consumer) { blb_engine_spawn_signal_consumer(e); }
+
+  if(e->enable_stats_reporter) { blb_engine_spawn_stats_reporter(e); }
 
   pthread_attr_t __attr;
   pthread_attr_init(&__attr);

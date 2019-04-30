@@ -42,6 +42,11 @@
     theTrace_release(); \
   } while(0)
 
+#define log_when(body) if(body)
+#define verbosity(lvl) (theTrace_get_verbosity() >= 0)
+#define log_enter() theTrace_lock()
+#define log_leave() theTrace_release()
+
 // 0 Emergency: system is unusable
 // 1 Alert: action must be taken immediately
 // 2 Critical: critical conditions
@@ -89,6 +94,7 @@
 
 typedef struct trace_config_t trace_config_t;
 struct trace_config_t {
+  int verbosity;
   FILE* stream;
   const char* host;
   const char* app;

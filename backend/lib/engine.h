@@ -62,6 +62,8 @@ struct engine_t {
   int conn_throttle_limit;
   db_t* db;
   socket_t listen_fd;
+  bool enable_stats_reporter;
+  bool enable_signal_consumer;
   pthread_t stats_reporter;
   pthread_t signal_consumer;
 };
@@ -130,13 +132,41 @@ static inline void blb_engine_stats_add(
   atomic_fetch_add(&engine->stats.counters[counter], x);
 }
 
+typedef struct engine_config_t engine_config_t;
+struct engine_config_t {
+  int conn_throttle_limit;
+  bool is_server;
+  bool enable_signal_consumer;
+  bool enable_stats_reporter;
+  db_t* db;
+  const char* host;
+  int port;
+};
+
+static inline engine_config_t blb_engine_server_config_init() {
+  return ((engine_config_t){.db = NULL,
+                            .conn_throttle_limit = 64,
+                            .is_server = true,
+                            .enable_stats_reporter = true,
+                            .enable_signal_consumer = true,
+                            .host = "127.0.0.1",
+                            .port = 4242});
+}
+
+static inline engine_config_t blb_engine_client_config_init() {
+  return ((engine_config_t){.db = NULL,
+                            .conn_throttle_limit = 64,
+                            .is_server = false,
+                            .enable_stats_reporter = true,
+                            .enable_signal_consumer = true,
+                            .host = "127.0.0.1",
+                            .port = 4242});
+}
+
 void blb_engine_signals_init(void);
-engine_t* blb_engine_server_new(
-    db_t* db, const char* name, int port, int conn_throttle_limit);
-conn_t* blb_engine_client_new(const char* host, int port);
+engine_t* blb_engine_server_new(const engine_config_t* config);
+conn_t* blb_engine_client_new(const engine_config_t* config);
 void blb_engine_teardown(engine_t* e);
-void blb_engine_spawn_signal_consumer(engine_t* e);
-void blb_engine_spawn_stats_reporter(engine_t* e);
 void blb_engine_run(engine_t* e);
 void blb_engine_request_stop(void);
 protocol_stream_t* blb_engine_stream_new(conn_t* c);

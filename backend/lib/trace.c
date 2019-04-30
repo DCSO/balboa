@@ -69,6 +69,7 @@ static void trace_flush(trace_t* trace) {
 
 static void trace_init(trace_t* trace, const trace_config_t* config) {
   trace->config = *config;
+  atomic_store(&trace->verbosity, config->verbosity);
   if(config->rfc5424) { trace->output = trace_output_rfc5424; }
   pthread_mutex_init(&trace->_lock, NULL);
 }
