@@ -159,9 +159,7 @@ static int dump_entry_replay_cb(state_t* state, protocol_entry_t* entry) {
 }
 
 static int main_query(int argc, char** argv) {
-  int verbosity = 0;
-  const char* host = "127.0.0.1";
-  int port = 4242;
+  engine_config_t engine_config = blb_engine_client_config_init();
   trace_config_t trace_config = {.stream = stderr,
                                  .host = "pdns",
                                  .app = "balboa-backend-console",
@@ -170,19 +168,18 @@ static int main_query(int argc, char** argv) {
   protocol_query_request_t __query = {0}, *query = &__query;
   ketopt_t opt = KETOPT_INIT;
   int c;
-  while((c = ketopt(&opt, argc, argv, 1, "h:p:r:d:s:l:v", NULL)) >= 0) {
+  while((c = ketopt(&opt, argc, argv, 1, "h:p:r:d:s:l:vSR", NULL)) >= 0) {
     switch(c) {
-    case 'v': verbosity += 1; break;
-    case 'h': host = opt.arg; break;
-    case 'p': port = atoi(opt.arg); break;
+    case 'v': trace_config.verbosity += 1; break;
+    case 'h': engine_config.host = opt.arg; break;
+    case 'p': engine_config.port = atoi(opt.arg); break;
     default: break;
     }
   }
 
   theTrace_stream_use(&trace_config);
-  theTrace_set_verbosity(verbosity);
 
-  conn_t* conn = blb_engine_client_new(host, port);
+  conn_t* conn = blb_engine_client_new(&engine_config);
   engine_t* engine = conn->engine;
 
   ssize_t used = blb_protocol_encode_query_request(
@@ -213,12 +210,14 @@ static int main_query(int argc, char** argv) {
   while(1) {
     protocol_message_t msg;
     int rc = blb_protocol_stream_decode(stream, &msg);
-    if(rc != 0) {
+    if(rc < 0) {
       L(log_error("blb_protocol_stream_decode() failed"));
       blb_protocol_stream_teardown(stream);
       blb_engine_teardown(engine);
       blb_engine_conn_teardown(conn);
       return (-1);
+    } else if(rc == 0) {
+      break;
     }
   }
 
