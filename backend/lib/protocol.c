@@ -728,11 +728,13 @@ int blb_protocol_stream_decode(
     protocol_stream_t* stream, protocol_message_t* out) {
   mpack_tree_t* tree = &stream->tree;
   mpack_tree_parse(tree);
-  switch(mpack_tree_error(tree)) {
+  mpack_error_t err = mpack_tree_error(tree);
+  switch(err) {
   case mpack_ok: break;
   case mpack_error_eof: return (-1);
   default:
-    L(log_error("mpack error `%d`", mpack_tree_error(tree)));
+    L(log_error(
+        "mpack error `%d` `%s`", err, mpack_error_to_string(err)));
     return (-2);
   }
 
