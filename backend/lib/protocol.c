@@ -731,7 +731,9 @@ int blb_protocol_stream_decode(
   switch(mpack_tree_error(tree)) {
   case mpack_ok: break;
   case mpack_error_eof: return (-1);
-  default: return (-2);
+  default:
+    L(log_error("mpack error `%d`", mpack_tree_error(tree)));
+    return (-2);
   }
 
   mpack_node_t root = mpack_tree_root(tree);
