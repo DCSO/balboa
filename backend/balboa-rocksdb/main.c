@@ -26,6 +26,8 @@ Usage: balboa-rocksdb [options]\n\
     -l listen address (default: 127.0.0.1)\n\
     -p listen port (default: 4242)\n\
     -v increase verbosity; can be passed multiple times\n\
+    -S disable signal handling\n\
+    -R disable engine stats reporter\n\
     -j connection throttle limit, maximum concurrent connections (default: 64)\n\
     --membudget <memory-in-bytes> rocksdb membudget option (value: %" PRIu64
       ")\n\
