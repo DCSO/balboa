@@ -117,5 +117,6 @@ int blb_protocol_dump_stream_decode(
     protocol_dump_stream_t* stream, protocol_entry_t* entry);
 
 void blb_protocol_log_entry(const protocol_entry_t* entry);
+void blb_protocol_log_query(const protocol_query_request_t* q);
 
 #endif

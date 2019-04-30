@@ -224,6 +224,63 @@ ssize_t blb_protocol_encode_entry(
   return (used_inner);
 }
 
+static ssize_t blb_protocol_encode_query(
+    const protocol_query_request_t* query, char* p, size_t p_sz) {
+  mpack_writer_t __wr = {0}, *wr = &__wr;
+  mpack_writer_init(wr, p, p_sz);
+
+  mpack_start_map(wr, 9);
+
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_LIMIT_KEY);
+  mpack_write_uint(wr, query->limit);
+
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_QRRNAME_KEY);
+  mpack_write_str(wr, query->qrrname, query->qrrname_len);
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_HRRNAME_KEY);
+  mpack_write_bool(wr, query->qrrname != NULL);
+
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_QRDATA_KEY);
+  mpack_write_str(wr, query->qrdata, query->qrdata_len);
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_HRDATA_KEY);
+  mpack_write_bool(wr, query->qrdata != NULL);
+
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_QRRTYPE_KEY);
+  mpack_write_str(wr, query->qrrtype, query->qrrtype_len);
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_HRRTYPE_KEY);
+  mpack_write_bool(wr, query->qrrtype != NULL);
+
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_QSENSORID_KEY);
+  mpack_write_str(wr, query->qsensorid, query->qsensorid_len);
+  mpack_write_cstr(wr, PROTOCOL_QUERY_REQUEST_HSENSORID_KEY);
+  mpack_write_bool(wr, query->qsensorid != NULL);
+
+  mpack_finish_map(wr);
+
+  size_t used_inner = mpack_writer_buffer_used(wr);
+
+  mpack_error_t err = mpack_writer_error(wr);
+  if(err != mpack_ok) {
+    L(log_error("encoding input failed with mpack_error_t `%d`", err));
+    mpack_writer_destroy(wr);
+    return (-1);
+  }
+
+  mpack_writer_destroy(wr);
+
+  return (used_inner);
+}
+
+ssize_t blb_protocol_encode_query_request(
+    const protocol_query_request_t* query, char* p, size_t p_sz) {
+  ssize_t used_inner = blb_protocol_encode_query(query, p, p_sz);
+  if(used_inner <= 0) {
+    L(log_error("blb_protocol_encode_qurey() failed"));
+    return (-1);
+  }
+  return (blb_protocol_encode_outer_request(
+      PROTOCOL_QUERY_REQUEST, p, p_sz, used_inner));
+}
+
 ssize_t blb_protocol_encode_input_request(
     const protocol_input_request_t* input, char* p, size_t p_sz) {
   ssize_t used_inner = blb_protocol_encode_entry(&input->entry, p, p_sz);
@@ -299,7 +356,7 @@ static int blb_protocol_decode_input(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
   const char* p = mpack_node_bin_data(payload);
   size_t p_sz = mpack_node_bin_size(payload);
-  X(log_debug("encoded message len %zu", p_sz));
+  X(log_debug("encoded message ptr `%p` sz `%zu`", p, p_sz));
   if(p == NULL || p_sz == 0) {
     L(log_error("invalid message"));
     return (-1);
@@ -409,7 +466,7 @@ static int blb_protocol_decode_query(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
   const char* p = mpack_node_bin_data(payload);
   size_t p_sz = mpack_node_bin_size(payload);
-  X(log_debug("encoded message len %zu", p_sz));
+  X(log_debug("encoded message ptr `%p` sz `%zu`", p, p_sz));
   if(p == NULL || p_sz == 0) {
     L(log_error("invalid message"));
     return (-1);
@@ -523,7 +580,7 @@ static int blb_protocol_decode_backup(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
   const char* p = mpack_node_bin_data(payload);
   size_t p_sz = mpack_node_bin_size(payload);
-  X(log_debug("encoded message len %zu", p_sz));
+  X(log_debug("encoded message ptr `%p` sz `%zu`", p, p_sz));
   if(p == NULL || p_sz == 0) {
     L(log_error("invalid message"));
     return (-1);
@@ -579,7 +636,7 @@ static int blb_protocol_decode_dump(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
   const char* p = mpack_node_bin_data(payload);
   size_t p_sz = mpack_node_bin_size(payload);
-  X(log_debug("encoded message len %zu", p_sz));
+  X(log_debug("encoded message ptr `%p` sz `%zu`", p, p_sz));
   if(p == NULL || p_sz == 0) {
     L(log_error("invalid message"));
     return (-1);
@@ -635,8 +692,8 @@ static int blb_protocol_decode_stream_start(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
   const char* p = mpack_node_bin_data(payload);
   size_t p_sz = mpack_node_bin_size(payload);
-  X(log_debug("encoded message len %zu", p_sz));
-  if(p != NULL || p_sz != 0) {
+  X(log_debug("encoded message ptr `%p` sz `%zu`", p, p_sz));
+  if(p == NULL || p_sz != 0) {
     L(log_error("invalid message"));
     return (-1);
   }
@@ -649,8 +706,8 @@ static int blb_protocol_decode_stream_end(
     protocol_stream_t* stream, mpack_node_t payload, protocol_message_t* out) {
   const char* p = mpack_node_bin_data(payload);
   size_t p_sz = mpack_node_bin_size(payload);
-  X(log_debug("encoded message len %zu", p_sz));
-  if(p != NULL || p_sz != 0) {
+  X(log_debug("encoded message ptr `%p` sz `%zu`", p, p_sz));
+  if(p == NULL || p_sz != 0) {
     L(log_error("invalid message"));
     return (-1);
   }
@@ -678,17 +735,17 @@ int blb_protocol_stream_decode(
   }
 
   mpack_node_t root = mpack_tree_root(tree);
-  WHEN_X {
-    theTrace_lock();
+  log_when(verbosity(3)) {
+    log_enter();
     log_debug(
-        "got message kv-pairs=%zu tree-size=%zu",
+        "got message map entries `%zu` tree-size `%zu`",
         mpack_node_map_count(root),
         mpack_tree_size(tree));
     for(size_t i = 0; i < mpack_node_map_count(root); i++) {
       mpack_node_t key = mpack_node_map_key_at(root, i);
-      log_debug("key[%zu]=%.*s", i, 1, mpack_node_str(key));
+      log_debug("key[%zu] `%.*s`", i, 1, mpack_node_str(key));
     }
-    theTrace_release();
+    log_leave();
   }
 
   mpack_node_t type =
@@ -812,7 +869,7 @@ int blb_protocol_dump_stream_decode(
 
 void blb_protocol_log_entry(const protocol_entry_t* entry) {
   log_debug(
-      "entry{ `%.*s` `%.*s` `%.*s` `%.*s` `%u` `%u` `%u` }",
+      "entry `%.*s` `%.*s` `%.*s` `%.*s` `%u` `%u` `%u`",
       (int)entry->rrname_len,
       entry->rrname,
       (int)entry->rrtype_len,
@@ -824,4 +881,18 @@ void blb_protocol_log_entry(const protocol_entry_t* entry) {
       entry->count,
       entry->first_seen,
       entry->last_seen);
+}
+
+void blb_protocol_log_query(const protocol_query_request_t* q) {
+  log_debug(
+      "query `%.*s` `%.*s` `%.*s` `%.*s` `%u`",
+      (int)q->qrrname_len,
+      q->qrrname,
+      (int)q->qrrtype_len,
+      q->qrrtype,
+      (int)q->qrdata_len,
+      q->qrdata,
+      (int)q->qsensorid_len,
+      q->qsensorid,
+      q->limit);
 }

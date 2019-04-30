@@ -43,7 +43,7 @@
   } while(0)
 
 #define log_when(body) if(body)
-#define verbosity(lvl) (theTrace_get_verbosity() >= 0)
+#define verbosity(lvl) (theTrace_get_verbosity() >= (lvl))
 #define log_enter() theTrace_lock()
 #define log_leave() theTrace_release()
 
