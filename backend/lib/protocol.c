@@ -733,8 +733,7 @@ int blb_protocol_stream_decode(
   case mpack_ok: break;
   case mpack_error_eof: return (-1);
   default:
-    L(log_error(
-        "mpack error `%s` `%d`", mpack_error_to_string(err), err));
+    L(log_error("mpack error `%s` `%d`", mpack_error_to_string(err), err));
     return (-2);
   }
 

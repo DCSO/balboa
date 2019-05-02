@@ -19,7 +19,7 @@
 #include <protocol.h>
 #include <trace.h>
 
-#define ENGINE_MPACK_TREE_MEMCAP (1024*100)
+#define ENGINE_MPACK_TREE_MEMCAP (1024 * 100)
 #define ENGINE_MPACK_TREE_NODES_LIMIT (1024)
 #define ENGINE_POLL_READ_TIMEOUT (60)
 #define ENGINE_POLL_WRITE_TIMEOUT (30)
