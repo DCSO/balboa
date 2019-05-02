@@ -19,8 +19,8 @@
 #include <protocol.h>
 #include <trace.h>
 
-#define ENGINE_MAX_MESSAGE_SZ ENGINE_CONN_SCRTCH_SZ
-#define ENGINE_MAX_MESSAGE_NODES (1024)
+#define ENGINE_MPACK_TREE_MEMCAP (1024*100)
+#define ENGINE_MPACK_TREE_NODES_LIMIT (1024)
 #define ENGINE_POLL_READ_TIMEOUT (60)
 #define ENGINE_POLL_WRITE_TIMEOUT (30)
 
@@ -293,8 +293,8 @@ protocol_stream_t* blb_engine_stream_new(conn_t* c) {
   protocol_stream_t* stream = blb_protocol_stream_new(
       c,
       blb_conn_read_stream_cb,
-      ENGINE_MAX_MESSAGE_SZ,
-      ENGINE_MAX_MESSAGE_NODES);
+      ENGINE_MPACK_TREE_MEMCAP,
+      ENGINE_MPACK_TREE_NODES_LIMIT);
   return (stream);
 }
 
