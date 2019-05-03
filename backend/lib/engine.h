@@ -62,6 +62,10 @@ struct engine_t {
   int conn_throttle_limit;
   db_t* db;
   socket_t listen_fd;
+  bool enable_stats_reporter;
+  bool enable_signal_consumer;
+  pthread_t stats_reporter;
+  pthread_t signal_consumer;
 };
 
 struct conn_t {
@@ -71,7 +75,7 @@ struct conn_t {
   void* usr_ctx;
   size_t usr_ctx_sz;
   socket_t fd;
-  char scrtch_response[ENGINE_CONN_SCRTCH_SZ];
+  char scrtch[ENGINE_CONN_SCRTCH_SZ];
 };
 
 static inline void blb_engine_sleep(long seconds) {
@@ -128,12 +132,46 @@ static inline void blb_engine_stats_add(
   atomic_fetch_add(&engine->stats.counters[counter], x);
 }
 
+typedef struct engine_config_t engine_config_t;
+struct engine_config_t {
+  int conn_throttle_limit;
+  bool is_server;
+  bool enable_signal_consumer;
+  bool enable_stats_reporter;
+  db_t* db;
+  const char* host;
+  int port;
+};
+
+static inline engine_config_t blb_engine_server_config_init() {
+  return ((engine_config_t){.db = NULL,
+                            .conn_throttle_limit = 64,
+                            .is_server = true,
+                            .enable_stats_reporter = true,
+                            .enable_signal_consumer = true,
+                            .host = "127.0.0.1",
+                            .port = 4242});
+}
+
+static inline engine_config_t blb_engine_client_config_init() {
+  return ((engine_config_t){.db = NULL,
+                            .conn_throttle_limit = 64,
+                            .is_server = false,
+                            .enable_stats_reporter = true,
+                            .enable_signal_consumer = true,
+                            .host = "127.0.0.1",
+                            .port = 4242});
+}
+
 void blb_engine_signals_init(void);
-engine_t* blb_engine_new(
-    db_t* db, const char* name, int port, int conn_throttle_limit);
+engine_t* blb_engine_server_new(const engine_config_t* config);
+conn_t* blb_engine_client_new(const engine_config_t* config);
 void blb_engine_teardown(engine_t* e);
 void blb_engine_run(engine_t* e);
 void blb_engine_request_stop(void);
+protocol_stream_t* blb_engine_stream_new(conn_t* c);
+int blb_conn_write_all(conn_t* th, char* _p, size_t _p_sz);
+void blb_engine_conn_teardown(conn_t* th);
 
 int blb_conn_query_stream_start_response(conn_t* th);
 int blb_conn_query_stream_push_response(conn_t*, const protocol_entry_t* entry);

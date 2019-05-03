@@ -60,9 +60,11 @@ static ssize_t dump_process(state_t* state, FILE* is) {
     case -1: return (entries);
     default:
       L(log_error("blb_dump_stream_decode() failed with `%d`", rc));
+      blb_protocol_dump_stream_teardown(stream);
       return (-entries);
     }
   }
+  blb_protocol_dump_stream_teardown(stream);
   return (entries);
 }
 
@@ -91,9 +93,9 @@ static int dump(state_t* state, const char* dump_file) {
   }
 }
 
-static int dump_entry_json_cb(state_t* state, protocol_entry_t* entry) {
-  assert(state->os != NULL);
-  bytestring_sink_t __sink = bs_sink(state->scrtch0, state->scrtch0_sz);
+static void dump_entry_as_json(
+    FILE* os, uint8_t* p, size_t p_sz, const protocol_entry_t* entry) {
+  bytestring_sink_t __sink = bs_sink(p, p_sz);
   bytestring_sink_t* sink = &__sink;
   int ok = 0;
   char buf[64] = {0};
@@ -120,12 +122,15 @@ static int dump_entry_json_cb(state_t* state, protocol_entry_t* entry) {
   ok += bs_append1(sink, '}');
   ok += bs_append1(sink, '\n');
   if(ok == 0) {
-    fwrite(sink->p, sink->index, 1, state->os);
-    return (0);
+    fwrite(sink->p, sink->index, 1, os);
   } else {
-    fputs("{\"error\":\"buffer-out-of-space\"}", state->os);
-    return (-1);
+    fputs("{\"error\":\"buffer-out-of-space\"}", os);
   }
+}
+
+static int dump_entry_json_cb(state_t* state, protocol_entry_t* entry) {
+  ASSERT(state->os != NULL);
+  dump_entry_as_json(state->os, state->scrtch0, state->scrtch0_sz, entry);
   return (0);
 }
 
@@ -153,6 +158,124 @@ static int dump_entry_replay_cb(state_t* state, protocol_entry_t* entry) {
     r -= rc;
     p += rc;
   }
+  return (0);
+}
+
+static int main_query(int argc, char** argv) {
+  engine_config_t engine_config = blb_engine_client_config_init();
+  trace_config_t trace_config = {.stream = stderr,
+                                 .host = "pdns",
+                                 .app = "balboa-backend-console",
+                                 // leaking process number ...
+                                 .procid = getpid()};
+  protocol_query_request_t __query = {0}, *query = &__query;
+  query->limit = 100;
+  ketopt_t opt = KETOPT_INIT;
+  int c;
+  while((c = ketopt(&opt, argc, argv, 1, "h:p:r:d:s:l:vSR", NULL)) >= 0) {
+    switch(c) {
+    case 'v': trace_config.verbosity += 1; break;
+    case 'h': engine_config.host = opt.arg; break;
+    case 'p': engine_config.port = atoi(opt.arg); break;
+    case 'd':
+      if(opt.arg == NULL) {
+        L(log_emergency("string for option `-d` required"));
+      }
+      query->qrdata = opt.arg;
+      query->qrdata_len = strlen(opt.arg);
+      break;
+    case 'r':
+      if(opt.arg == NULL) {
+        L(log_emergency("string for option `-r` required"));
+      }
+      query->qrrname = opt.arg;
+      query->qrrname_len = strlen(opt.arg);
+      break;
+    case 's':
+      if(opt.arg == NULL) {
+        L(log_emergency("string for option `-s` required"));
+      }
+      query->qsensorid = opt.arg;
+      query->qsensorid_len = strlen(opt.arg);
+      break;
+    default: break;
+    }
+  }
+
+  theTrace_stream_use(&trace_config);
+
+  conn_t* conn = blb_engine_client_new(&engine_config);
+  engine_t* engine = conn->engine;
+
+  V(blb_protocol_log_query(query));
+
+  ssize_t used = blb_protocol_encode_query_request(
+      query, conn->scrtch, ENGINE_CONN_SCRTCH_SZ);
+  if(used <= 0) {
+    L(log_error("unable to encode query"));
+    blb_engine_teardown(engine);
+    blb_engine_conn_teardown(conn);
+    return (-1);
+  }
+
+  int rc = blb_conn_write_all(conn, conn->scrtch, used);
+  if(rc != 0) {
+    L(log_debug("blb_conn_write_all() failed"));
+    blb_engine_teardown(engine);
+    blb_engine_conn_teardown(conn);
+    return (-1);
+  }
+
+  protocol_stream_t* stream = blb_engine_stream_new(conn);
+  if(stream == NULL) {
+    L(log_error("blb_engine_stream_new() failed"));
+    blb_engine_teardown(engine);
+    blb_engine_conn_teardown(conn);
+    return (-1);
+  }
+
+  enum state_t { START, STREAM, END };
+
+  enum state_t st = START;
+  while(1) {
+    protocol_message_t msg;
+    int rc = blb_protocol_stream_decode(stream, &msg);
+    if(rc < -1) {
+      L(log_error("blb_protocol_stream_decode() failed"));
+      blb_protocol_stream_teardown(stream);
+      blb_engine_teardown(engine);
+      blb_engine_conn_teardown(conn);
+      return (-1);
+    } else if(rc == -1) {
+      break;
+    }
+    switch(st) {
+    case START: {
+      switch(msg.ty) {
+      case PROTOCOL_QUERY_STREAM_START_RESPONSE: st = STREAM; break;
+      default: L(log_emergency("(start) received invalid message"));
+      }
+      break;
+    }
+    case STREAM: {
+      switch(msg.ty) {
+      case PROTOCOL_QUERY_STREAM_END_RESPONSE: st = END; goto done;
+      case PROTOCOL_QUERY_STREAM_DATA_RESPONSE: {
+        uint8_t json[1024 * 10];
+        dump_entry_as_json(stdout, json, sizeof(json), &msg.u.entry);
+        break;
+      }
+      default: L(log_emergency("(stream) received invalid message"));
+      }
+      break;
+    }
+    default: L(log_emergency("invalid state: impossible"));
+    }
+  }
+done:
+  blb_protocol_stream_teardown(stream);
+  blb_engine_teardown(engine);
+  blb_engine_conn_teardown(conn);
   return (0);
 }
 
@@ -392,6 +515,10 @@ int main(int argc, char** argv) {
     argc--;
     argv++;
     res = main_dump(argc, argv);
+  } else if(strcmp(argv[1], "query") == 0) {
+    argc--;
+    argv++;
+    res = main_query(argc, argv);
   } else if(strcmp(argv[1], "--version") == 0) {
     version();
   } else {

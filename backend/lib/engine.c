@@ -19,8 +19,8 @@
 #include <protocol.h>
 #include <trace.h>
 
-#define ENGINE_MAX_MESSAGE_SZ ENGINE_CONN_SCRTCH_SZ
-#define ENGINE_MAX_MESSAGE_NODES (1024)
+#define ENGINE_MPACK_TREE_MEMCAP (1024 * 100)
+#define ENGINE_MPACK_TREE_NODES_LIMIT (1024)
 #define ENGINE_POLL_READ_TIMEOUT (60)
 #define ENGINE_POLL_WRITE_TIMEOUT (30)
 
@@ -93,7 +93,7 @@ timeout_retry:
   return (0);
 }
 
-static int blb_conn_write_all(conn_t* th, char* _p, size_t _p_sz) {
+int blb_conn_write_all(conn_t* th, char* _p, size_t _p_sz) {
   int wr_ok = blb_engine_poll_write(th->fd, ENGINE_POLL_WRITE_TIMEOUT);
   if(wr_ok != 0) {
     L(log_error("blb_engine_poll_write() failed"));
@@ -123,13 +123,13 @@ int blb_conn_query_stream_start_response(conn_t* th) {
   }
 
   ssize_t used = blb_protocol_encode_stream_start_response(
-      th->scrtch_response, ENGINE_CONN_SCRTCH_SZ);
+      th->scrtch, ENGINE_CONN_SCRTCH_SZ);
   if(used <= 0) {
     L(log_error("blb_protocol_encode_stream_start_response() failed"));
     return (-1);
   }
 
-  return (blb_conn_write_all(th, th->scrtch_response, used));
+  return (blb_conn_write_all(th, th->scrtch, used));
 }
 
 int blb_conn_dump_entry(conn_t* th, const protocol_entry_t* entry) {
@@ -141,14 +141,14 @@ int blb_conn_dump_entry(conn_t* th, const protocol_entry_t* entry) {
     return (-1);
   }
 
-  ssize_t used = blb_protocol_encode_dump_entry(
-      entry, th->scrtch_response, ENGINE_CONN_SCRTCH_SZ);
+  ssize_t used =
+      blb_protocol_encode_dump_entry(entry, th->scrtch, ENGINE_CONN_SCRTCH_SZ);
   if(used <= 0) {
     L(log_error("blb_protocol_encode_dump_entry() failed"));
     return (-1);
   }
 
-  return (blb_conn_write_all(th, th->scrtch_response, used));
+  return (blb_conn_write_all(th, th->scrtch, used));
 }
 
 int blb_conn_query_stream_push_response(
@@ -162,13 +162,13 @@ int blb_conn_query_stream_push_response(
   }
 
   ssize_t used = blb_protocol_encode_stream_entry(
-      entry, th->scrtch_response, ENGINE_CONN_SCRTCH_SZ);
+      entry, th->scrtch, ENGINE_CONN_SCRTCH_SZ);
   if(used <= 0) {
     L(log_error("blb_protocol_encode_stream_entry() failed"));
     return (-1);
   }
 
-  return (blb_conn_write_all(th, th->scrtch_response, used));
+  return (blb_conn_write_all(th, th->scrtch, used));
 }
 
 int blb_conn_query_stream_end_response(conn_t* th) {
@@ -178,7 +178,7 @@ int blb_conn_query_stream_end_response(conn_t* th) {
   }
 
   ssize_t used = blb_protocol_encode_stream_end_response(
-      th->scrtch_response, ENGINE_CONN_SCRTCH_SZ);
+      th->scrtch, ENGINE_CONN_SCRTCH_SZ);
   if(used <= 0) {
     L(log_error("blb_protocol_encode_stream_end_response() failed"));
     return (-1);
@@ -187,7 +187,7 @@ int blb_conn_query_stream_end_response(conn_t* th) {
   X(log_debug(
       "blb_protocol_encode_stream_end_response() returned `%zd`", used));
 
-  return (blb_conn_write_all(th, th->scrtch_response, used));
+  return (blb_conn_write_all(th, th->scrtch, used));
 }
 
 static conn_t* blb_engine_conn_new(engine_t* e, int fd) {
@@ -195,19 +195,22 @@ static conn_t* blb_engine_conn_new(engine_t* e, int fd) {
   if(th == NULL) { return (NULL); }
   th->usr_ctx = NULL;
   th->usr_ctx_sz = 0;
-  db_t* db = blb_dbi_conn_init(th, e->db);
-  if(db == NULL) {
-    blb_free(th);
-    return (NULL);
+  th->db = NULL;
+  if(e->db != NULL) {
+    db_t* db = blb_dbi_conn_init(th, e->db);
+    if(db == NULL) {
+      blb_free(th);
+      return (NULL);
+    }
+    th->db = db;
   }
-  th->db = db;
   th->engine = e;
   th->fd = fd;
   return (th);
 }
 
-static void blb_engine_conn_teardown(conn_t* th) {
-  blb_dbi_conn_deinit(th, th->db);
+void blb_engine_conn_teardown(conn_t* th) {
+  if(th->db != NULL) { blb_dbi_conn_deinit(th, th->db); }
   close(th->fd);
   blb_free(th);
 }
@@ -286,17 +289,22 @@ static inline int blb_engine_conn_consume(conn_t* th, protocol_message_t* msg) {
   }
 }
 
+protocol_stream_t* blb_engine_stream_new(conn_t* c) {
+  protocol_stream_t* stream = blb_protocol_stream_new(
+      c,
+      blb_conn_read_stream_cb,
+      ENGINE_MPACK_TREE_MEMCAP,
+      ENGINE_MPACK_TREE_NODES_LIMIT);
+  return (stream);
+}
+
 static void* blb_engine_conn_fn(void* usr) {
   ASSERT(usr != NULL);
   conn_t* th = usr;
   blb_thread_cnt_incr();
   T(log_info("new thread is <%04lx>", th->thread));
 
-  protocol_stream_t* stream = blb_protocol_stream_new(
-      th,
-      blb_conn_read_stream_cb,
-      ENGINE_MAX_MESSAGE_SZ,
-      ENGINE_MAX_MESSAGE_NODES);
+  protocol_stream_t* stream = blb_engine_stream_new(th);
   if(stream == NULL) {
     L(log_error("unalbe to create protocol decode stream"));
     goto thread_exit;
@@ -333,19 +341,19 @@ thread_exit:
   return (NULL);
 }
 
-engine_t* blb_engine_new(
-    db_t* db, const char* name, int port, int conn_throttle_limit) {
-  ASSERT(db != NULL);
+engine_t* blb_engine_server_new(const engine_config_t* config) {
+  ASSERT(config->db != NULL);
+  ASSERT(config->is_server == true);
 
   struct sockaddr_in __ipv4, *ipv4 = &__ipv4;
-  int rc = inet_pton(AF_INET, name, &ipv4->sin_addr);
+  int rc = inet_pton(AF_INET, config->host, &ipv4->sin_addr);
   ASSERT(rc >= 0);
   if(rc != 1) {
     errno = EINVAL;
     return (NULL);
   }
   ipv4->sin_family = AF_INET;
-  ipv4->sin_port = htons((uint16_t)port);
+  ipv4->sin_port = htons((uint16_t)config->port);
   int fd = socket(ipv4->sin_family, SOCK_STREAM, 0);
   if(fd < 0) {
     L(log_error("socket() failed with `%s`", strerror(errno)));
@@ -372,17 +380,63 @@ engine_t* blb_engine_new(
     return (NULL);
   }
 
-  e->conn_throttle_limit = conn_throttle_limit;
-  e->db = db;
+  e->conn_throttle_limit = config->conn_throttle_limit;
+  e->enable_signal_consumer = config->enable_signal_consumer;
+  e->enable_stats_reporter = config->enable_stats_reporter;
+  e->db = config->db;
   e->listen_fd = fd;
   e->stats.interval = 10;
   for(int i = 0; i < ENGINE_STATS_N; i++) {
     atomic_store(&e->stats.counters[i], 0);
   }
 
-  V(log_info("listening on host `%s` port `%d` fd `%d`", name, port, fd));
+  V(log_info(
+      "listening on host `%s` port `%d` fd `%d`",
+      config->host,
+      config->port,
+      fd));
 
   return (e);
+}
+
+static int blb_engine_client_connect(const char* host, int port) {
+  struct sockaddr_in addr;
+  int addr_ok = inet_pton(AF_INET, host, &addr.sin_addr);
+  if(addr_ok != 1) { return (-1); }
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons((uint16_t)port);
+  int fd = socket(addr.sin_family, SOCK_STREAM, 0);
+  if(fd < 0) { return (-1); }
+  int rc = connect(fd, &addr, sizeof(struct sockaddr_in));
+  if(rc < 0) {
+    L(log_error("connect() failed with `%s`", strerror(errno)));
+    close(fd);
+    return (-1);
+  }
+  return (fd);
+}
+
+conn_t* blb_engine_client_new(const engine_config_t* config) {
+  ASSERT(config->db == NULL);
+  ASSERT(config->is_server == false);
+  int fd = blb_engine_client_connect(config->host, config->port);
+  if(fd < 0) { return (NULL); }
+
+  engine_t* e = blb_new(engine_t);
+  if(e == NULL) {
+    close(fd);
+    return (NULL);
+  }
+  e->db = NULL;
+
+  conn_t* c = blb_engine_conn_new(e, fd);
+  if(c == NULL) {
+    L(log_error("blb_engine_conn_new() failed"));
+    blb_free(e);
+    return (NULL);
+  }
+
+  return (c);
 }
 
 static void* blb_engine_signal_consume(void* usr) {
@@ -415,22 +469,6 @@ static void* blb_engine_signal_consume(void* usr) {
   return (NULL);
 }
 
-void blb_engine_signals_init(void) {
-  sigset_t s;
-  sigemptyset(&s);
-  sigaddset(&s, SIGQUIT);
-  sigaddset(&s, SIGUSR1);
-  sigaddset(&s, SIGUSR2);
-  sigaddset(&s, SIGINT);
-  sigaddset(&s, SIGPIPE);
-  sigaddset(&s, SIGTERM);
-  int rc = pthread_sigmask(SIG_BLOCK, &s, NULL);
-  if(rc != 0) { L(log_error("pthread_sigmask() failed `%d`", rc)); }
-
-  pthread_t signal_consumer;
-  pthread_create(&signal_consumer, NULL, blb_engine_signal_consume, NULL);
-}
-
 static inline unsigned long long blb_stats_slurp(
     engine_stats_t* s, enum engine_stats_counter_t c) {
   if(c < 0 || c >= ENGINE_STATS_N) { return (ULLONG_MAX); }
@@ -440,7 +478,7 @@ static inline unsigned long long blb_stats_slurp(
 }
 
 static void* blb_engine_stats_report(void* usr) {
-  V(log_info("engine stats thread started"));
+  V(log_info("engine stats reporter thread started"));
   engine_t* e = usr;
   blb_thread_cnt_incr();
   pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
@@ -475,12 +513,31 @@ static void* blb_engine_stats_report(void* usr) {
   return (NULL);
 }
 
+void blb_engine_spawn_signal_consumer(engine_t* e) {
+  sigset_t s;
+  sigemptyset(&s);
+  sigaddset(&s, SIGQUIT);
+  sigaddset(&s, SIGUSR1);
+  sigaddset(&s, SIGUSR2);
+  sigaddset(&s, SIGINT);
+  sigaddset(&s, SIGPIPE);
+  sigaddset(&s, SIGTERM);
+  int rc = pthread_sigmask(SIG_BLOCK, &s, NULL);
+  if(rc != 0) { L(log_error("pthread_sigmask() failed `%d`", rc)); }
+  pthread_create(&e->signal_consumer, NULL, blb_engine_signal_consume, e);
+}
+
+void blb_engine_spawn_stats_reporter(engine_t* e) {
+  pthread_create(&e->stats_reporter, NULL, blb_engine_stats_report, e);
+}
+
 void blb_engine_run(engine_t* e) {
   struct sockaddr_in __addr, *addr = &__addr;
   socklen_t addrlen = sizeof(struct sockaddr_in);
 
-  pthread_t stats_reporter;
-  pthread_create(&stats_reporter, NULL, blb_engine_stats_report, e);
+  if(e->enable_signal_consumer) { blb_engine_spawn_signal_consumer(e); }
+
+  if(e->enable_stats_reporter) { blb_engine_spawn_stats_reporter(e); }
 
   pthread_attr_t __attr;
   pthread_attr_init(&__attr);
