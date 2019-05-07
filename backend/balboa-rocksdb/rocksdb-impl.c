@@ -351,7 +351,7 @@ static int blb_rocksdb_query_by_o(
               != 0) {
       break;
     }
-    if((size_t)toks[RRNAME].tok_len != qrrname_len) { continue; }
+    if((size_t)toks[RRNAME].tok_len != qrrname_len) { break; }
 
     if(toks[SENSORID].tok_len == 0
        || (q->qsensorid_len > 0
@@ -520,7 +520,7 @@ static int blb_rocksdb_query_by_i(
               != 0) {
       break;
     }
-    if((size_t)toks[RDATA].tok_len != qrdata_len) { continue; }
+    if((size_t)toks[RDATA].tok_len != qrdata_len) { break; }
 
     if(toks[SENSORID].tok_len == 0
        || (q->qsensorid_len > 0
