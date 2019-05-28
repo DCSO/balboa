@@ -1,9 +1,4 @@
 feeder:
-    - name: AMQPInput2
-      type: amqp
-      url: amqp://guest:guest@localhost:5672
-      exchange: [ tdh.pdns ]
-      input_format: fever_aggregate 
     - name: HTTP Input
       type: http
       listen_host: 127.0.0.1
