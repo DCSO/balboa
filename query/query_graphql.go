@@ -259,8 +259,12 @@ func (r *Resolver) Entries(args struct {
 			l = append(l, &er)
 		}
 	} else {
+		lim := int(args.Limit)
 		for _, sid := range *args.SensorID {
-			results, err := db.ObservationDB.Search(args.Rdata, args.Rrname, args.Rrtype, sid, int(args.Limit))
+			if lim < 1 {
+				break
+			}
+			results, err := db.ObservationDB.Search(args.Rdata, args.Rrname, args.Rrtype, sid, lim)
 			if err != nil {
 				return nil, err
 			}
@@ -268,6 +272,7 @@ func (r *Resolver) Entries(args struct {
 				er := EntryResolver{
 					entry: r,
 				}
+				lim--
 				l = append(l, &er)
 			}
 		}
