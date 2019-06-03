@@ -22,7 +22,6 @@ The balboa software...
 - can accept input from multiple sources simultaneously
   - HTTP (POST)
   - AMQP
-  - GraphQL
   - Unix socket
 - accepts various (text-based) input formats
   - JSON-based
