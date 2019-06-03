@@ -36,9 +36,10 @@ The balboa software...
 ## Building and Installation
 
 ```text
-$ go get github.com/DCSO/balboa
+$ go get github.com/DCSO/balboa/cmd/balboa
 ...
 ```
+This will drop a `balboa` executable in your Go bin path.
 
 To build the backends:
 
