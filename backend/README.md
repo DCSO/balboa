@@ -64,7 +64,7 @@ Usage: balboa-rocksdb [options]
 Now start *balboa* and the backend to feed pDNS observations into it:
 
 ```text
-$ balboa-rocksdb -p 4242 -h 127.0.0.1 -d /tmp/balboa-rocksdb -D
+$ balboa-rocksdb -p 4242 -l 127.0.0.1 -d /tmp/balboa-rocksdb -D
 $ balboa serve -l '' -host 127.0.0.1:4242 -f my-feeders.yaml
 ...
 ```
