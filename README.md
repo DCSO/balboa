@@ -22,7 +22,6 @@ The balboa software...
 - can accept input from multiple sources simultaneously
   - HTTP (POST)
   - AMQP
-  - GraphQL
   - Unix socket
 - accepts various (text-based) input formats
   - JSON-based
@@ -37,9 +36,10 @@ The balboa software...
 ## Building and Installation
 
 ```text
-$ go get github.com/DCSO/balboa
+$ go get github.com/DCSO/balboa/cmd/balboa
 ...
 ```
+This will drop a `balboa` executable in your Go bin path.
 
 To build the backends:
 
