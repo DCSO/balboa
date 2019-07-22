@@ -553,7 +553,7 @@ static int blb_protocol_decode_query(
       h->hsensorid = mpack_expect_bool(rd);
     } else {
       L(log_error(
-          "invalid inner message: unkown key: `%.*s`", (int)key_len, key));
+          "invalid inner message: unknown key: `%.*s`", (int)key_len, key));
       goto decode_error;
     }
   }
