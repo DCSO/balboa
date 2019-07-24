@@ -44,7 +44,7 @@ This will drop a `balboa` executable in your Go bin path.
 To build the backends:
 
 ```text
-$ cd $GOPATH/src/github.com/DCSO/balboa/backends
+$ cd $GOPATH/src/github.com/DCSO/balboa/backend
 $ make
 ...
 ```
