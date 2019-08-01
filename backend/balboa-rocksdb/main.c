@@ -29,11 +29,9 @@ Usage: balboa-rocksdb [options]\n\
     -S disable signal handling\n\
     -R disable engine stats reporter\n\
     -j connection throttle limit, maximum concurrent connections (default: 64)\n\
-    --membudget <memory-in-bytes> rocksdb membudget option (value: %" PRIu64
-      ")\n\
+    --membudget <memory-in-bytes> rocksdb membudget option (value: %zu)\n\
     --parallelism <number-of-threads> rocksdb parallelism option (value: %d)\n\
-    --max_log_file_size <size> rocksdb log file size option (value: %" PRIu64
-      ")\n\
+    --max_log_file_size <size> rocksdb log file size option (value: %zu)\n\
     --max_open_files <number> rocksdb max number of open files (value: %d)\n\
     --keep_log_file_num <number> rocksdb max number of log files (value: %d)\n\
     --database_path <path> same as `-d`\n\
