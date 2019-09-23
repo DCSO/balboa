@@ -1,4 +1,8 @@
-# 📑 balboa [![CircleCI](https://circleci.com/gh/DCSO/balboa.svg?style=svg)](https://circleci.com/gh/DCSO/balboa)
+# 📑 balboa
+
+[![CircleCI](https://circleci.com/gh/DCSO/balboa.svg?style=svg)](https://circleci.com/gh/DCSO/balboa)
+[![Go Report Card](https://goreportcard.com/badge/github.com/DCSO/balboa)](https://goreportcard.com/report/github.com/DCSO/balboa)
+
 
 balboa is the BAsic Little Book Of Answers. It consumes and indexes
 observations from [passive DNS](https://www.farsightsecurity.com/technical/passive-dns/)
