@@ -15,8 +15,9 @@ jobs:
           command: 'echo "deb http://ftp.debian.org/debian stretch-backports main" | sudo tee -a /etc/apt/sources.list.d/backports.list'
       - run:
           name: Install apt dependencies
-          command: 'sudo apt-get update && sudo apt-get -t stretch-backports install librocksdb-dev libtpl-dev -y'
+          command: 'sudo apt-get update && sudo apt-get -t stretch-backports install librocksdb-dev -y'
 
       # specify any bash command here prefixed with `run: `
       - run: go get -v -t -d ./...
       - run: go test -v ./...
+      - run: make -C backend
