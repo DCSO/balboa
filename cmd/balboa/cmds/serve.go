@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/DCSO/balboa/db"
-	"github.com/DCSO/balboa/feeder"
-	"github.com/DCSO/balboa/observation"
-	"github.com/DCSO/balboa/query"
+	"balboa/db"
+	"balboa/feeder"
+	"balboa/observation"
+	"balboa/query"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DCSO/balboa/observation"
+	"balboa/observation"
 
 	log "github.com/sirupsen/logrus"
 )

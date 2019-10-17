@@ -7,7 +7,7 @@ import (
 	"errors"
 	"net"
 
-	obs "github.com/DCSO/balboa/observation"
+	obs "balboa/observation"
 
 	log "github.com/sirupsen/logrus"
 )

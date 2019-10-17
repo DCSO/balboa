@@ -3,7 +3,7 @@
 
 package main
 
-import cmd "github.com/DCSO/balboa/cmd/balboa/cmds"
+import cmd "balboa/cmd/balboa/cmds"
 
 func main() {
 	cmd.Execute()

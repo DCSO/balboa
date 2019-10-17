@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DCSO/balboa/observation"
+	"balboa/observation"
 	"github.com/sirupsen/logrus/hooks/test"
 )
 

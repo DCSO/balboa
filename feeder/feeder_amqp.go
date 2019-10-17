@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DCSO/balboa/format"
-	"github.com/DCSO/balboa/observation"
+	"balboa/format"
+	"balboa/observation"
 
 	"github.com/NeowayLabs/wabbit"
 	amqp "github.com/NeowayLabs/wabbit/amqp"

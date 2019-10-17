@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DCSO/balboa/format"
-	"github.com/DCSO/balboa/observation"
+	"balboa/format"
+	"balboa/observation"
 
 	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"

@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/DCSO/balboa/db"
-	"github.com/DCSO/balboa/observation"
+	"balboa/db"
+	"balboa/observation"
 
 	graphql "github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/errors"
@@ -315,7 +315,7 @@ type EntryResolver struct {
 
 // ID returns the ID field of the corresponding entry.
 func (r *EntryResolver) ID() graphql.ID {
-	id, _ := uuid.NewV4()
+	id := uuid.NewV4()
 	return graphql.ID(id.String())
 }
 

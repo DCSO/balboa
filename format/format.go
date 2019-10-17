@@ -3,7 +3,7 @@
 
 package format
 
-import "github.com/DCSO/balboa/observation"
+import "balboa/observation"
 
 // MakeObservationFunc is a function that accepts a byte array with input
 // obtained from a feeder, a sensor ID, a channel for the generated
