@@ -8,6 +8,8 @@ require (
 	github.com/farsightsec/go-nmsg v0.0.0-20190917161327-04d2174033bb
 	github.com/farsightsec/golang-framestream v0.0.0-20190425193708-fa4b164d59b8 // indirect
 	github.com/fsouza/go-dockerclient v1.5.0 // indirect
+	github.com/gogo/protobuf v1.2.1
+	github.com/golang/protobuf v1.3.1
 	github.com/graph-gophers/graphql-go v0.0.0-20190917030536-38a077bc812d
 	github.com/machinebox/graphql v0.2.2
 	github.com/matryer/is v1.2.0 // indirect

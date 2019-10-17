@@ -61,6 +61,11 @@ func (n *NmsgSocketFeeder) handleServerConnection() {
 				}
 				break
 			}
+			if payload.GetVid() != 2 {
+				// check for SIE Vendor Id
+				// see https://github.com/farsightsec/nmsg/blob/master/nmsg/vendors.h
+				continue
+			}
 			_ = n.MakeObservationFunc(payload.GetPayload(), "[unknown]", n.ObsChan, n.StopChan)
 		}
 	}
