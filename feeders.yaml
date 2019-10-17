@@ -17,3 +17,8 @@ feeder:
       type: socket
       path: /tmp/suri.sock
       input_format: suricata_dns
+    - name: SIE NMSG Input
+      type: nmsg_socket
+      bind_address: 0.0.0.0:4141
+      mtu: 1480
+      input_format: nmsg

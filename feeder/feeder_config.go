@@ -29,6 +29,9 @@ type Setup struct {
 		ListenPort int    `yaml:"listen_port"`
 		// for socket input
 		Path string `yaml:"path"`
+		// for NmsgSocket
+		BindAddress string `yaml:"bind_address"`
+		Mtu         int    `yaml:"mtu"`
 	} `yaml:"feeder"`
 	Feeders map[string]Feeder
 }
@@ -100,6 +103,13 @@ func (fs *Setup) Run(in chan observation.InputObservation) error {
 			}
 			fs.Feeders[v.Name] = f
 			fs.Feeders[v.Name].Run(in)
+		case "nmsg_socket":
+			f, err := MakeNmsgSocketFeeder(v.BindAddress, v.Mtu)
+			if err != nil {
+				return err
+			}
+			fs.Feeders[v.Name] = f
+			fs.Feeders[v.Name].Run(in)
 		}
 		switch v.InputFormat {
 		case "fever_aggregate":
@@ -112,6 +122,8 @@ func (fs *Setup) Run(in chan observation.InputObservation) error {
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeSuricataInputObservations)
 		case "gamelinux":
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeFjellskaalInputObservations)
+		case "nmsg":
+			fs.Feeders[v.Name].SetInputDecoder(format.MakeNmsgInputObservations)
 		default:
 			log.Fatalf("unknown input format: %s", v.InputFormat)
 		}
