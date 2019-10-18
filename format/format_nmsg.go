@@ -14,13 +14,13 @@ func parseDomainString(rdata []byte) (domain string) {
 	for i < uint(len(rdata)) && rdata[i] != 0 {
 		di := uint(rdata[i])
 		if (i+1 > uint(len(rdata))) || (i+1+di > uint(len(rdata))) {
-			return "" // parsing error
+			return string(rdata) // parsing error
 		}
 		domain = domain + string(rdata[i+1:i+1+di]) + "."
 		i += 1 + di
 	}
 	if len(domain) < 2 {
-		return "" // parsing error
+		return string(rdata) // parsing error
 	}
 	domain = domain[0 : len(domain)-1]
 	return domain
@@ -71,7 +71,7 @@ func parseRData(rdata []byte, rrtype int) string {
 			return "" // corrupt record
 		}
 		return fmt.Sprintf("%d.%d.%d.%d", rdata[0], rdata[1], rdata[2], rdata[3])
-	case RRT_NS, RRT_CNAME:
+	case RRT_NS, RRT_CNAME, RRT_MX:
 		return parseDomainString(rdata)
 	default:
 		return string(rdata)
