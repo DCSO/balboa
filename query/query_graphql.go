@@ -13,7 +13,7 @@ import (
 	"github.com/DCSO/balboa/db"
 	"github.com/DCSO/balboa/observation"
 
-	graphql "github.com/graph-gophers/graphql-go"
+	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/errors"
 	"github.com/graph-gophers/graphql-go/relay"
 	uuid "github.com/satori/go.uuid"
@@ -216,22 +216,22 @@ func (r *Resolver) Entries(args struct {
 		if args.Rdata != nil {
 			rdata = *args.Rdata
 		} else {
-			rdata = ("nil")
+			rdata = "nil"
 		}
 		if args.Rrname != nil {
 			rrname = *args.Rrname
 		} else {
-			rrname = ("nil")
+			rrname = "nil"
 		}
 		if args.Rrtype != nil {
 			rrtype = *args.Rrtype
 		} else {
-			rrtype = ("nil")
+			rrtype = "nil"
 		}
 		if args.SensorID != nil {
 			sensorID = *args.SensorID
 		} else {
-			sensorID = ("nil")
+			sensorID = "nil"
 		}
 		log.Debugf("finished query for (%s/%s/%s/%s) in %v", rdata, rrname, rrtype, sensorID, time.Since(startTime))
 	}()
@@ -313,9 +313,18 @@ type EntryResolver struct {
 	entry observation.Observation
 }
 
+// Ugly hack to evade problems caused by changes in the uuid.NewV* API
+func filterUuidNewV4(uuid uuid.UUID, args ...interface{}) uuid.UUID {
+	return uuid
+}
+
+func uuidNewV4() uuid.UUID {
+	return filterUuidNewV4(uuid.NewV4())
+}
+
 // ID returns the ID field of the corresponding entry.
 func (r *EntryResolver) ID() graphql.ID {
-	id, _ := uuid.NewV4()
+	id := uuidNewV4()
 	return graphql.ID(id.String())
 }
 

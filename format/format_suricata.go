@@ -29,7 +29,7 @@ type suriDNSEntry struct {
 			TTL    int    `json:"ttl"`
 			Rdata  string `json:"rdata"`
 		} `json:"answers"`
-		Grouped map[string]([]string) `json:"grouped"`
+		Grouped map[string][]string `json:"grouped"`
 	} `json:"dns"`
 }
 

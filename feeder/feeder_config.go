@@ -5,13 +5,14 @@ package feeder
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/DCSO/balboa/format"
 	"github.com/DCSO/balboa/observation"
 
 	log "github.com/sirupsen/logrus"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 // Setup describes a collection of feeders that should be active, including
@@ -29,6 +30,9 @@ type Setup struct {
 		ListenPort int    `yaml:"listen_port"`
 		// for socket input
 		Path string `yaml:"path"`
+		// for NmsgSocket
+		BindAddress string `yaml:"bind_address"`
+		Mtu         int    `yaml:"mtu"`
 	} `yaml:"feeder"`
 	Feeders map[string]Feeder
 }
@@ -80,6 +84,14 @@ func LoadSetup(in []byte) (*Setup, error) {
 	return &fs, nil
 }
 
+// Check whether the feeder is a nmsg_socket feeder and warn the user accordingly
+func (fs *Setup) checkForNmsgFeeder(name string) {
+	if reflect.TypeOf(fs.Feeders[name]) == reflect.TypeOf((*NmsgSocketFeeder)(nil)) {
+		// the feeder is a NmsgSocketFeeder, warn the user
+		log.Warnf("the feeder %s is a nmsg_socket but not configured to read nmsg messages, this is likely a misconfiguration", name)
+	}
+}
+
 // Run starts all feeders according to the description in the setup, in the
 // background. Use Stop() to stop the feeders.
 func (fs *Setup) Run(in chan observation.InputObservation) error {
@@ -100,18 +112,36 @@ func (fs *Setup) Run(in chan observation.InputObservation) error {
 			}
 			fs.Feeders[v.Name] = f
 			fs.Feeders[v.Name].Run(in)
+		case "nmsg_socket":
+			f, err := MakeNmsgSocketFeeder(v.BindAddress, v.Mtu)
+			if err != nil {
+				return err
+			}
+			fs.Feeders[v.Name] = f
+			fs.Feeders[v.Name].Run(in)
 		}
 		switch v.InputFormat {
 		case "fever_aggregate":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeFeverAggregateInputObservations)
 		case "gopassivedns":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeGopassivednsInputObservations)
 		case "packetbeat":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakePacketbeatInputObservations)
 		case "suricata_dns":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeSuricataInputObservations)
 		case "gamelinux":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeFjellskaalInputObservations)
+		case "nmsg":
+			if reflect.TypeOf(fs.Feeders[v.Name]) != reflect.TypeOf((*NmsgSocketFeeder)(nil)) {
+				// the feeder is no NmsgSocketFeeder, warn the user
+				log.Warnf("the feeder %s is not a nmsg_socket but configured to read nmsg messages, this is likely a misconfiguration", v.Name)
+			}
+			fs.Feeders[v.Name].SetInputDecoder(format.MakeNmsgInputObservations)
 		default:
 			log.Fatalf("unknown input format: %s", v.InputFormat)
 		}
