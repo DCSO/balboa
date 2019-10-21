@@ -87,10 +87,16 @@ func MakeNmsgInputObservations(inputNmsg []byte, sensorID string, out chan obser
 		return err
 	}
 
+	rdata := nd.GetRdata()
+	rdataFirst := []byte("")
+	if len(rdata) > 0 {
+		rdataFirst = rdata[0]
+	}
+
 	o := observation.InputObservation{
 		Count: 1,
 		// TODO: Rdata should be a []string or even better a [][]byte field
-		Rdata:          parseRData(nd.GetRdata()[0], int(nd.GetRrtype())),
+		Rdata:          parseRData(rdataFirst, int(nd.GetRrtype())),
 		Rrtype:         parseRRType(int(nd.GetRrtype())),
 		Rrname:         parseDomainString(nd.GetRrname()),
 		SensorID:       sensorID,
