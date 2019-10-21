@@ -27,6 +27,7 @@ The balboa software...
   - HTTP (POST)
   - AMQP
   - Unix socket
+  - network socket (NMSG format only)
 - accepts various (text-based) input formats
   - JSON-based
     - [FEVER](https://github.com/DCSO/fever)
@@ -36,6 +37,8 @@ The balboa software...
     - [Suricata EVE DNS v1 and v2](http://suricata.readthedocs.io/en/latest/output/eve/eve-json-format.html#event-type-dns)
   - flat file
     - Edward Fjellskål's [PassiveDNS](https://github.com/gamelinux/passivedns) tabular format (default order `-f SMcsCQTAtn`)
+  - binary formats
+    - Farsight Security [NMSG format](https://www.farsightsecurity.com/txt-record/2015/01/28/nmsg-intro/) via network socket
 
 ## Building and Installation
 
@@ -57,7 +60,7 @@ This will create a binary executable in the `build/` subdirectories of each back
 
 ### Dependencies
 
-- Go 1.7 or later
+- Go 1.10 or later
 - [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
 
 On Debian (testing and stretch-backports), one can satisfy these dependencies with:
