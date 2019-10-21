@@ -313,9 +313,18 @@ type EntryResolver struct {
 	entry observation.Observation
 }
 
+// Ugly hack to evade problems caused by the in the uuid.NewV* API
+func filterUuidNewV4(uuid uuid.UUID, args ... interface{}) uuid.UUID {
+	return uuid
+}
+
+func uuidNewV4() uuid.UUID {
+	return filterUuidNewV4(uuid.NewV4())
+}
+
 // ID returns the ID field of the corresponding entry.
 func (r *EntryResolver) ID() graphql.ID {
-	id := uuid.NewV4()
+	id := uuidNewV4()
 	return graphql.ID(id.String())
 }
 
