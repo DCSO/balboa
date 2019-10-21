@@ -313,8 +313,8 @@ type EntryResolver struct {
 	entry observation.Observation
 }
 
-// Ugly hack to evade problems caused by the in the uuid.NewV* API
-func filterUuidNewV4(uuid uuid.UUID, args ... interface{}) uuid.UUID {
+// Ugly hack to evade problems caused by changes in the uuid.NewV* API
+func filterUuidNewV4(uuid uuid.UUID, args ...interface{}) uuid.UUID {
 	return uuid
 }
 

@@ -5,6 +5,7 @@ package feeder
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/DCSO/balboa/format"
@@ -83,6 +84,14 @@ func LoadSetup(in []byte) (*Setup, error) {
 	return &fs, nil
 }
 
+// Check whether the feeder is a nmsg_socket feeder and warn the user accordingly
+func (fs *Setup) checkForNmsgFeeder(name string) {
+	if reflect.TypeOf(fs.Feeders[name]) == reflect.TypeOf((*NmsgSocketFeeder)(nil)) {
+		// the feeder is no NmsgSocketFeeder socket feeder, warn the user
+		log.Warnf("the feeder %s is a nmsg_socket but not configured to read nmsg messages, this is likely a misconfiguration", name)
+	}
+}
+
 // Run starts all feeders according to the description in the setup, in the
 // background. Use Stop() to stop the feeders.
 func (fs *Setup) Run(in chan observation.InputObservation) error {
@@ -113,16 +122,25 @@ func (fs *Setup) Run(in chan observation.InputObservation) error {
 		}
 		switch v.InputFormat {
 		case "fever_aggregate":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeFeverAggregateInputObservations)
 		case "gopassivedns":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeGopassivednsInputObservations)
 		case "packetbeat":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakePacketbeatInputObservations)
 		case "suricata_dns":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeSuricataInputObservations)
 		case "gamelinux":
+			fs.checkForNmsgFeeder(v.Name)
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeFjellskaalInputObservations)
 		case "nmsg":
+			if reflect.TypeOf(fs.Feeders[v.Name]) != reflect.TypeOf((*NmsgSocketFeeder)(nil)) {
+				// the feeder is no NmsgSocketFeeder socket feeder, warn the user
+				log.Warnf("the feeder %s is not a nmsg_socket but configured to read nmsg messages, this is likely a misconfiguration", v.Name)
+			}
 			fs.Feeders[v.Name].SetInputDecoder(format.MakeNmsgInputObservations)
 		default:
 			log.Fatalf("unknown input format: %s", v.InputFormat)
