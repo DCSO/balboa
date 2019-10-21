@@ -3,7 +3,7 @@
 
 package db
 
-import "balboa/observation"
+import "github.com/DCSO/balboa/observation"
 
 // ObservationDB is the common DB instance used for this balboa session.
 var ObservationDB DB

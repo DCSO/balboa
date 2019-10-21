@@ -1,9 +1,9 @@
 package format
 
 import (
-	"balboa/observation"
 	"bytes"
 	"encoding/hex"
+	"github.com/DCSO/balboa/observation"
 	"github.com/farsightsec/go-nmsg"
 	"github.com/sirupsen/logrus/hooks/test"
 	"testing"

@@ -4,7 +4,7 @@
 package cmds
 
 import (
-	db "balboa/backend/go"
+	db "github.com/DCSO/balboa/backend/go"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

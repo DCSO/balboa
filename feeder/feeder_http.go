@@ -9,8 +9,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"balboa/format"
-	"balboa/observation"
+	"github.com/DCSO/balboa/format"
+	"github.com/DCSO/balboa/observation"
 
 	log "github.com/sirupsen/logrus"
 )

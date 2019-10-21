@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	"balboa/format"
-	"balboa/observation"
+	"github.com/DCSO/balboa/format"
+	"github.com/DCSO/balboa/observation"
 
 	log "github.com/sirupsen/logrus"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 // Setup describes a collection of feeders that should be active, including

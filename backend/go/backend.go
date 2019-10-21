@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"balboa/db"
-	obs "balboa/observation"
+	"github.com/DCSO/balboa/db"
+	obs "github.com/DCSO/balboa/observation"
 
 	log "github.com/sirupsen/logrus"
 )

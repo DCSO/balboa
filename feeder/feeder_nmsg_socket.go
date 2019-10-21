@@ -1,9 +1,9 @@
 package feeder
 
 import (
-	"balboa/format"
-	"balboa/observation"
 	"bufio"
+	"github.com/DCSO/balboa/format"
+	"github.com/DCSO/balboa/observation"
 	"net"
 	"time"
 

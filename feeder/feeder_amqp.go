@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"balboa/format"
-	"balboa/observation"
+	"github.com/DCSO/balboa/format"
+	"github.com/DCSO/balboa/observation"
 
 	"github.com/NeowayLabs/wabbit"
-	amqp "github.com/NeowayLabs/wabbit/amqp"
+	"github.com/NeowayLabs/wabbit/amqp"
 	log "github.com/sirupsen/logrus"
 	origamqp "github.com/streadway/amqp"
 )

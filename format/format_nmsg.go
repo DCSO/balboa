@@ -1,8 +1,8 @@
 package format
 
 import (
-	"balboa/observation"
 	"fmt"
+	"github.com/DCSO/balboa/observation"
 	"time"
 
 	"github.com/gogo/protobuf/proto"

@@ -1,4 +1,4 @@
-module balboa
+module github.com/DCSO/balboa
 
 go 1.13
 

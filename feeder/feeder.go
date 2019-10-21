@@ -4,8 +4,8 @@
 package feeder
 
 import (
-	"balboa/format"
-	"balboa/observation"
+	"github.com/DCSO/balboa/format"
+	"github.com/DCSO/balboa/observation"
 )
 
 // Feeder is an interface of a component that accepts observations in a
