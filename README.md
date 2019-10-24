@@ -28,6 +28,8 @@ The balboa software...
   - AMQP
   - Unix socket
   - network socket (NMSG format only)
+- can select and filter observations
+- can store observations to one or multiple backends based on matched selectors
 - accepts various (text-based) input formats
   - JSON-based
     - [FEVER](https://github.com/DCSO/fever)
@@ -112,12 +114,63 @@ as to where an observation has come from. It is possible to specify multiple
 feeders of the same type but with different settings as long as their `name`s
 are unique.
 
+### Configuring selectors
+
+Balboa provides a selector engine which can be used to select or filter observations.
+The selector engine is configured in a YAML file which is provided via the `-s` parameter to balboa.
+
+Available selector implementations:
+
+* regex: match the `RRNAME` field of the observation with one or multiple selectors
+
+Example:
+
+```yaml
+selectors:
+  - name: Filter Unwanted TLDs
+    type: regex
+    mode: filter
+    regexp:
+      - unwanted_regex.txt
+    tags:
+      - filtered_tlds
+  - name: CobaltStrike Regex
+    type: regex
+    mode: select
+    regexp:
+      - cobaltstrike_regex.txt
+    ingest:
+      - filtered_tlds
+    tags:
+      - possible_cobaltstrike
+```
+
+This configuration will tag all observations which are **not** matched by the regular expressions in `unwanted_regex.txt` with the tag `filtered_tlds`.
+All observations which are tagged with `filtered_tlds` and which match one or more regular expressions in `cobaltstrike_regex.txt` are tagged with `possible_cobaltstrike`.
+
 ### Configuring the database backend
 
 Multiple database backends are supported to store pDNS observations
 persistently. Each database backend is provided as a self-contained binary
 (executable). The frontend connects to exactly one database backend. The
 backend, however, supports multiple client or frontend connections.
+Each backend can either configure all observations (no `tags` parameter) or a list of tags (conditional or).
+
+The backend configuration is defined in a YAML file (to be passed via the `-b` parameter to `balboa server`). Example:
+
+```yaml
+- name: cobaltstrike
+  host: "localhost:4242"
+  tags:
+    - possible_cobaltstrike
+- name: all filtered observations
+  host: "localhost:4343"
+  tags:
+    - filtered_tlds
+```
+
+A balboa instance with this backend configuration will store all events tagged with `possible_cobaltstrike` to the backend
+listening on port `localhost:4242` and all events tagged with `filtered_tlds` to the backend on `localhost:4343`.
 
 ### Running the backend and frontend services, consuming input
 
@@ -152,7 +205,7 @@ $ balboa-rocksdb --database_path /data/pdns -l 127.0.0.1 -p 4242
 After starting the backend the `balboa` frontend can be started as follows:
 
 ```text
-$ balboa serve -l '' --host 127.0.0.1:4242
+$ balboa serve -l ''
 INFO[0000] starting feeder AMQPInput2
 INFO[0000] starting feeder HTTP Input
 INFO[0000] accepting submissions on port 8081
@@ -232,6 +285,10 @@ This also works with `rdata` as the query parameter, but at least one of
 all results will be returned regardless of where the DNS answer was observed.
 Use the `time_first_rfc3339` and `time_last_rfc3339` instead of `time_first`
 and `time_last`, respectively, to get human-readable timestamps.
+
+When multiple backends are configured a query will be dispatched to every backend.
+Accordingly when an observation is stored in multiple backends the result to the query
+will contain duplicates.
 
 ### Aliases
 

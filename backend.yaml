@@ -1,0 +1,10 @@
+#- name: cobaltstrike
+#  host: "localhost:4242"
+#  tags:
+#    - possible_cobaltstrike
+#- name: all filtered observations
+#  host: "localhost:4343"
+#  tags:
+#    - filtered_tlds
+- name: default backend
+  host: "localhost:4242"

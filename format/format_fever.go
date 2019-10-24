@@ -57,6 +57,8 @@ func MakeFeverAggregateInputObservations(inputJSON []byte, sensorID string, out 
 						SensorID:       sensorID,
 						TimestampEnd:   in.TimestampEnd,
 						TimestampStart: in.TimestampStart,
+						Tags:           map[string]struct{}{},
+						Selectors:      map[interface{}]struct{}{},
 					}
 					i++
 					out <- o

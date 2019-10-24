@@ -58,6 +58,8 @@ func MakeFjellskaalInputObservations(inputJSON []byte, sensorID string, out chan
 					SensorID:       sensorID,
 					TimestampEnd:   timestamp,
 					TimestampStart: timestamp,
+					Tags:           map[string]struct{}{},
+					Selectors:      map[interface{}]struct{}{},
 				}
 				i++
 				out <- o

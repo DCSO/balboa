@@ -1,0 +1,17 @@
+selectors:
+  - name: Filter Unwanted TLDs
+    type: regex
+    mode: filter
+    regexp:
+      - unwanted_regex.txt
+    tags:
+      - filtered_tlds
+  - name: CobaltStrike Regex
+    type: regex
+    mode: select
+    regexp:
+      - cobaltstrike_regex.txt
+    ingest:
+      - filtered_tlds
+    tags:
+      - possible_cobaltstrike

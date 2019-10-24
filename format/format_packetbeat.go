@@ -59,6 +59,8 @@ func MakePacketbeatInputObservations(inputJSON []byte, sensorID string, out chan
 				SensorID:       sensorID,
 				TimestampEnd:   tst,
 				TimestampStart: tst,
+				Tags:           map[string]struct{}{},
+				Selectors:      map[interface{}]struct{}{},
 			}
 			i++
 			out <- o

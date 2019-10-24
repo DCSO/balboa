@@ -57,6 +57,8 @@ func MakeGopassivednsInputObservations(inputJSON []byte, sensorID string, out ch
 		SensorID:       sensorID,
 		TimestampEnd:   tst,
 		TimestampStart: tst,
+		Tags:           map[string]struct{}{},
+		Selectors:      map[interface{}]struct{}{},
 	}
 	out <- o
 	log.Debug("enqueued 1 observation")

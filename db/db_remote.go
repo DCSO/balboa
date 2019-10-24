@@ -4,7 +4,7 @@
 package db
 
 import (
-	"errors"
+	"gopkg.in/yaml.v2"
 	"net"
 
 	obs "github.com/DCSO/balboa/observation"
@@ -12,13 +12,29 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type RemoteBackend struct {
-	host     string
-	StopChan chan bool
+type Backend struct {
+	Name string   `yaml:"name"`
+	Host string   `yaml:"host"`
+	Tags []string `yaml:"tags"`
 }
 
-func MakeRemoteBackend(host string, refill bool) (*RemoteBackend, error) {
-	return &RemoteBackend{StopChan: make(chan bool), host: host}, nil
+type RemoteBackend struct {
+	stopChan chan bool
+	backends []*Backend
+}
+
+func MakeRemoteBackend(config []byte, refill bool) (*RemoteBackend, error) {
+	var backends []*Backend
+	err := yaml.Unmarshal(config, &backends)
+	if err != nil {
+		log.Fatalf("could not read backend configuration due to %v", err)
+	}
+	if len(backends) < 1 {
+		log.Fatalf("no or malformed backend configuration provided")
+	}
+	db := &RemoteBackend{stopChan: make(chan bool), backends: backends}
+
+	return db, nil
 }
 
 func (db *RemoteBackend) AddObservation(o obs.InputObservation) obs.Observation {
@@ -37,33 +53,70 @@ func (db *RemoteBackend) Dump(path string) {
 func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
 	enc := MakeEncoder()
 	defer enc.Release()
-	conn, conn_err := net.Dial("tcp", db.host)
-	if conn_err != nil {
-		log.Warnf("connecting to backend failed: %v", conn_err)
-		return
+	// hosts maps tags to connections
+	hosts := make(map[string][]*net.Conn)
+	for _, backend := range db.backends {
+		conn, err := net.Dial("tcp", backend.Host)
+		if err != nil {
+			log.Fatalf("could not connect to backend %v due to %v", backend.Name, err)
+		}
+		if len(backend.Tags) != 0 {
+			for _, tag := range backend.Tags {
+				if _, ok := hosts[tag]; ok {
+					hosts[tag] = append(hosts[tag], &conn)
+				} else {
+					hosts[tag] = make([]*net.Conn, 1)
+					hosts[tag][0] = &conn
+				}
+			}
+		} else {
+			// the backend has no tags specified, consume everything
+			tag := ""
+			if _, ok := hosts[tag]; ok {
+				hosts[tag] = append(hosts[tag], &conn)
+			} else {
+				hosts[tag] = make([]*net.Conn, 1)
+				hosts[tag][0] = &conn
+			}
+		}
 	}
-	defer conn.Close()
 	for {
 		select {
-		case <-db.StopChan:
+		case <-db.stopChan:
 			log.Info("stop request received")
 			return
 		case obs := <-inChan:
-			log.Debug("received observation")
-			w, err := enc.EncodeInputRequest(obs)
-			if err != nil {
-				log.Warnf("encoding observation failed: %s", err)
-				continue
-			}
-			wanted := w.Len()
-			n, err := w.WriteTo(conn)
-			if err != nil {
-				log.Warnf("sending observation failed: %s", err)
-				return
-			}
-			if n != int64(wanted) {
-				log.Warnf("short write")
-				return
+			for tag, connections := range hosts {
+				match := false
+				for obTag := range obs.Tags {
+					if obTag == tag {
+						match = true
+						break
+					}
+				}
+				if tag != "" && !match {
+					continue
+				}
+
+				for _, conn := range connections {
+					// since the backend does not support storage of tags yet remove tags from the observation
+					obs.Tags = nil
+					w, err := enc.EncodeInputRequest(obs)
+					if err != nil {
+						log.Warnf("encoding observation failed: %s", err)
+						continue
+					}
+					wanted := w.Len()
+					n, err := w.WriteTo(*conn)
+					if err != nil {
+						log.Warnf("sending observation failed: %s", err)
+						continue
+					}
+					if n != int64(wanted) {
+						log.Warnf("short write")
+						continue
+					}
+				}
 			}
 		}
 	}
@@ -90,53 +143,62 @@ func (db *RemoteBackend) Search(qrdata, qrrname, qrrtype, qsensorID *string, lim
 		Limit:     limit,
 	}
 
-	conn, conn_err := net.Dial("tcp", db.host)
-	if conn_err != nil {
-		log.Warnf("connecting to backend failed %v", conn_err)
-		return []obs.Observation{}, conn_err
-	}
-	defer conn.Close()
+	var result []obs.Observation
 
-	enc := MakeEncoder()
-	defer enc.Release()
+	for _, backend := range db.backends {
+		conn, connErr := net.Dial("tcp", backend.Host)
+		if connErr != nil {
+			log.Warnf("connecting to backend failed %v", connErr)
+			conn.Close()
+			continue
+		}
 
-	w, enc_err := enc.EncodeQueryRequest(qry)
-	if enc_err != nil {
-		log.Warnf("unable to encode query")
-		return []obs.Observation{}, enc_err
-	}
+		enc := MakeEncoder()
+		w, encErr := enc.EncodeQueryRequest(qry)
+		if encErr != nil {
+			log.Warnf("unable to encode query %v", encErr)
+			conn.Close()
+			enc.Release()
+			continue
+		}
 
-	wanted := w.Len()
+		wanted := w.Len()
+		n, errWr := w.WriteTo(conn)
+		if errWr != nil {
+			log.Infof("sending query failed; closing connection %v", errWr)
+			conn.Close()
+			enc.Release()
+			continue
+		}
 
-	n, err_wr := w.WriteTo(conn)
-	if err_wr != nil {
-		log.Infof("sending query failed; closing connection")
+		if n != int64(wanted) {
+			log.Infof("sending query failed; short write; closing connection")
+			conn.Close()
+			enc.Release()
+			continue
+		}
+
+		log.Debugf("sent query (%d bytes)", n)
+
+		dec := MakeDecoder(conn)
+		qryResult, err := dec.ExpectQueryResponse()
+
+		log.Debugf("received answer")
+
+		if err != nil {
+			log.Warnf("ExpectQueryResponse() failed with `%v`", err)
+			conn.Close()
+			dec.Release()
+			enc.Release()
+			continue
+		}
 		conn.Close()
-		return []obs.Observation{}, err_wr
+		dec.Release()
+		enc.Release()
+		result = append(result, qryResult.Obs[:]...)
 	}
 
-	if n != int64(wanted) {
-		log.Infof("sending query failed; short write; closing connection")
-		conn.Close()
-		return []obs.Observation{}, errors.New("sending query failed")
-	}
-
-	log.Debugf("sent query (%d bytes)", n)
-
-	dec := MakeDecoder(conn)
-	defer dec.Release()
-
-	result, err := dec.ExpectQueryResponse()
-
-	log.Debugf("received answer")
-
-	if err != nil {
-		log.Warnf("ExpectQueryResponse() failed with `%v`", err)
-		conn.Close()
-		return []obs.Observation{}, err
-	}
-
-	return result.Obs, nil
+	return result, nil
 }
 
 func (db *RemoteBackend) TotalCount() (int, error) {
@@ -144,5 +206,5 @@ func (db *RemoteBackend) TotalCount() (int, error) {
 }
 
 func (db *RemoteBackend) Shutdown() {
-	close(db.StopChan)
+	close(db.stopChan)
 }

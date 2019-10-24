@@ -67,6 +67,8 @@ func MakeSuricataInputObservations(inputJSON []byte, sensorID string, out chan o
 					SensorID:       sensorID,
 					TimestampEnd:   tst,
 					TimestampStart: tst,
+					Tags:           map[string]struct{}{},
+					Selectors:      map[interface{}]struct{}{},
 				}
 				i++
 				out <- o
@@ -83,6 +85,8 @@ func MakeSuricataInputObservations(inputJSON []byte, sensorID string, out chan o
 						SensorID:       sensorID,
 						TimestampEnd:   tst,
 						TimestampStart: tst,
+						Tags:           map[string]struct{}{},
+						Selectors:      map[interface{}]struct{}{},
 					}
 					i++
 					out <- o
@@ -99,6 +103,8 @@ func MakeSuricataInputObservations(inputJSON []byte, sensorID string, out chan o
 			SensorID:       sensorID,
 			TimestampEnd:   tst,
 			TimestampStart: tst,
+			Tags:           map[string]struct{}{},
+			Selectors:      map[interface{}]struct{}{},
 		}
 		i++
 		out <- o

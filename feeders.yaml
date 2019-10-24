@@ -1,22 +1,9 @@
 feeder:
-    - name: AMQPInput2
-      type: amqp
-      url: amqp://guest:guest@localhost:5672
-      exchange: [ tdh.pdns ]
-      input_format: fever_aggregate 
     - name: HTTP Input
       type: http
       listen_host: 127.0.0.1
       listen_port: 8081
-      input_format: fever_aggregate 
-    - name: Socket Input
-      type: socket
-      path: /tmp/balboa.sock
       input_format: fever_aggregate
-    - name: Suricata Socket Input
-      type: socket
-      path: /tmp/suri.sock
-      input_format: suricata_dns
     - name: SIE NMSG Input
       type: nmsg_socket
       bind_address: 0.0.0.0:4141
