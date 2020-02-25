@@ -4,6 +4,7 @@
 package cmds
 
 import (
+	"github.com/DCSO/balboa/selector"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -17,6 +18,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+/*
+ * TODO:
+ *    * trap SIGHUP and reinitialize selectors
+ */
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
@@ -65,11 +71,15 @@ answering queries.`,
 		}
 
 		// connect to backend
-		host, err := cmd.Flags().GetString("host")
+		backend, err := cmd.Flags().GetString("backend")
 		if err != nil {
 			log.Fatal(err)
 		}
-		db.ObservationDB, err = db.MakeRemoteBackend(host, true)
+		backendConfig, err := ioutil.ReadFile(backend)
+		if err != nil {
+			log.Fatalf("could not read backend configuration due to %v", err)
+		}
+		db.ObservationDB, err = db.MakeRemoteBackend(backendConfig, true)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -88,6 +98,30 @@ answering queries.`,
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		// Set up selectors from config file
+		var selectorsFile string
+		selectorsFile, err = cmd.Flags().GetString("selectors")
+		if err != nil {
+			log.Fatal(err)
+		}
+		cfgSelectors, err := ioutil.ReadFile(selectorsFile)
+		selectorsEnabled := true
+		if err != nil {
+			log.Warnf("not using the selector subsystem due to %v", err)
+			selectorsEnabled = false
+		}
+
+		var selectorOutChan chan observation.InputObservation
+		var selectorEngine *selector.Engine
+		if selectorsEnabled {
+			selectorOutChan = make(chan observation.InputObservation)
+			selectorEngine, err = selector.MakeSelectorEngine(cfgSelectors, selectorOutChan)
+			if err != nil {
+				log.Fatalf("could not instantiate selector engine due to %v", err)
+			}
+		}
+
 		err = fsetup.Run(observation.InChan)
 		if err != nil {
 			log.Fatal(err)
@@ -103,12 +137,20 @@ answering queries.`,
 					return
 				default:
 					log.Infof("ConsumeFeed() starting")
-					db.ObservationDB.ConsumeFeed(observation.InChan)
+					if selectorsEnabled {
+						db.ObservationDB.ConsumeFeed(selectorOutChan)
+					} else {
+						db.ObservationDB.ConsumeFeed(observation.InChan)
+					}
 					log.Info("ConsumeFeed() finished")
 					time.Sleep(10 * time.Second)
 				}
 			}
 		}()
+
+		if selectorsEnabled {
+			selectorEngine.ConsumeFeed(observation.InChan)
+		}
 
 		// start query server
 		var port int
@@ -141,8 +183,9 @@ func init() {
 
 	serveCmd.Flags().BoolP("verbose", "v", false, "verbose mode")
 	serveCmd.Flags().StringP("feeders", "f", "feeders.yaml", "feeders configuration file")
+	serveCmd.Flags().StringP("selectors", "s", "selectors.yaml", "selectors configuration file")
 	serveCmd.Flags().IntP("port", "p", 8080, "port for GraphQL server")
 	serveCmd.Flags().StringP("logfile", "l", "/var/log/balboa.log", "log file path")
 	serveCmd.Flags().BoolP("logjson", "j", true, "output log file as JSON")
-	serveCmd.Flags().StringP("host", "H", "127.0.0.1:4242", "remote database host and port")
+	serveCmd.Flags().StringP("backend", "b", "backend.yaml", "backend configuration file")
 }

@@ -102,6 +102,8 @@ func MakeNmsgInputObservations(inputNmsg []byte, sensorID string, out chan obser
 		SensorID:       sensorID,
 		TimestampEnd:   time.Unix(int64(nd.GetTimeSeen()), 0),
 		TimestampStart: time.Unix(int64(nd.GetTimeSeen()), 0),
+		Tags:           map[string]struct{}{},
+		Selectors:      map[interface{}]struct{}{},
 	}
 	out <- o
 	return nil
