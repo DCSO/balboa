@@ -1,3 +1,4 @@
+-- implement the process function for custom lua selectors
 function process(o)
     print("observation fields:")
     print(o:rcode())

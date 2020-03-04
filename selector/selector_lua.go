@@ -2,9 +2,10 @@ package selector
 
 import (
 	"errors"
+	"io/ioutil"
+
 	"github.com/DCSO/balboa/observation"
 	lua "github.com/yuin/gopher-lua"
-	"io/ioutil"
 )
 
 const (
@@ -142,7 +143,6 @@ func (l *LuaSelector) Reinitialize() (err error) {
 }
 
 func (l *LuaSelector) ProcessObservation(observation *observation.InputObservation) (err error) {
-
 	fn := l.L.GetGlobal(luaProcessObservationFunc)
 	if err := l.L.CallByParam(lua.P{
 		Fn:      fn,

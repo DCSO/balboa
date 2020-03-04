@@ -122,6 +122,7 @@ The selector engine is configured in a YAML file which is provided via the `-s` 
 Available selector implementations:
 
 * regex: match the `RRNAME` field of the observation with one or multiple selectors
+* lua: process observations with lua scripts, see *selector.lua* for an example
 
 Example:
 

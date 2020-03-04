@@ -15,8 +15,9 @@ selectors:
       - filtered_tlds
     tags:
       - possible_cobaltstrike
-  - name: Lua Selector
-    type: lua
-    script: selector.lua
-    ingest:
-      - filtered_tlds
+# Example for a lua selector configuration
+#  - name: Lua Selector
+#    type: lua
+#    script: selector.lua
+#    ingest:
+#      - filtered_tlds
