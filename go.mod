@@ -22,5 +22,6 @@ require (
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
 	github.com/tiago4orion/conjure v0.0.0-20150908101743-93cb30b9d218 // indirect
 	github.com/ugorji/go/codec v1.1.7
+	github.com/yuin/gopher-lua v0.0.0-20191220021717-ab39c6098bdb
 	gopkg.in/yaml.v2 v2.2.4
 )
