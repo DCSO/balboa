@@ -28,18 +28,18 @@ The balboa software...
   - AMQP
   - Unix socket
   - network socket (NMSG format only)
-- can select and filter observations
+- can tag and filter observations based on various properties
 - can store observations to one or multiple backends based on matched selectors
-- accepts various (text-based) input formats
+- accepts various input formats
   - JSON-based
     - [FEVER](https://github.com/DCSO/fever)
     - [gopassivedns](https://github.com/Phillipmartin/gopassivedns)
     - [Packetbeat](https://www.elastic.co/guide/en/beats/packetbeat/master/packetbeat-dns-options.html) (via
       Logstash)
     - [Suricata EVE DNS v1 and v2](http://suricata.readthedocs.io/en/latest/output/eve/eve-json-format.html#event-type-dns)
-  - flat file
+  - flat text file
     - Edward Fjellskål's [PassiveDNS](https://github.com/gamelinux/passivedns) tabular format (default order `-f SMcsCQTAtn`)
-  - binary formats
+  - binary
     - Farsight Security [NMSG format](https://www.farsightsecurity.com/txt-record/2015/01/28/nmsg-intro/) via network socket
 
 ## Building and Installation
@@ -176,8 +176,9 @@ listening on port `localhost:4242` and all events tagged with `filtered_tlds` to
 ### Running the backend and frontend services, consuming input
 
 All interaction with the frontend on the command line takes place via the
-`balboa` frontend executable. The frontend depends on a backend service. E.g
-the RocksDB backend can be started using:
+`balboa` frontend executable. The frontend depends on a backend service,
+which is usually its own executable.
+For instance, the RocksDB backend can be started using:
 
 ```text
 $ balboa-rocksdb -h
