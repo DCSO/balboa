@@ -14,16 +14,16 @@ passive DNS data aggregated from metadata gathered by
 The API should be suitable for integration into existing multi-source
 observable integration frameworks. It is possible to produce results in a
 [Common Output Format](https://datatracker.ietf.org/doc/draft-dulaunoy-dnsop-passive-dns-cof/)
-compatible schema using the GraphQL API. In fact, the GraphQL schema is
-modelled after the COF fields.
+compatible schema using either a GraphQL API (see below) or a REST API compatible with
+[CIRCL's](https://www.circl.lu/services/passive-dns/).
 
 The balboa software...
 
 - is fast for queries and input/updates
-- implements persistent, compressed storage of observations
+- implements storage using pluggable backends, potentially on separate machines
 - supports tracking and specifically querying multiple sensors
-- makes use of multi-core systems
-- can accept input from multiple sources simultaneously
+- makes use of multiple cores for query and ingest
+- accepts input from multiple sources simultaneously
   - HTTP (POST)
   - AMQP
   - Unix socket
@@ -63,7 +63,7 @@ This will create a binary executable in the `build/` subdirectories of each back
 ### Dependencies
 
 - Go 1.10 or later
-- [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
+- For the bundled RocksDB backend: [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
 
 On Debian (testing and stretch-backports), one can satisfy these dependencies with:
 
