@@ -1,5 +1,5 @@
 // balboa
-// Copyright (c) 2019, DCSO GmbH
+// Copyright (c) 2019, 2020, DCSO GmbH
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -205,6 +205,10 @@ static int main_query(int argc, char** argv) {
   theTrace_stream_use(&trace_config);
 
   conn_t* conn = blb_engine_client_new(&engine_config);
+  if(conn == NULL) {
+    L(log_error("unable to connect to backend"));
+    return (-1);
+  }
   engine_t* engine = conn->engine;
 
   V(blb_protocol_log_query(query));
