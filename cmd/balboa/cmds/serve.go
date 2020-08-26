@@ -1,10 +1,9 @@
 // balboa
-// Copyright (c) 2018, DCSO GmbH
+// Copyright (c) 2018, 2020, DCSO GmbH
 
 package cmds
 
 import (
-	"github.com/DCSO/balboa/selector"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -15,6 +14,8 @@ import (
 	"github.com/DCSO/balboa/feeder"
 	"github.com/DCSO/balboa/observation"
 	"github.com/DCSO/balboa/query"
+	"github.com/DCSO/balboa/selector"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
