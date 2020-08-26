@@ -35,3 +35,20 @@ func (o *Observation) MarshalJSON() ([]byte, error) {
 		Alias:     (*Alias)(o),
 	})
 }
+
+func (o *Observation) UnmarshalJSON(data []byte) error {
+	type Alias Observation
+	tmp := &struct {
+		FirstSeen int64 `json:"time_first"`
+		LastSeen  int64 `json:"time_last"`
+		*Alias
+	}{
+		Alias: (*Alias)(o),
+	}
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	o.FirstSeen = time.Unix(tmp.FirstSeen, 0)
+	o.LastSeen = time.Unix(tmp.LastSeen, 0)
+	return nil
+}
