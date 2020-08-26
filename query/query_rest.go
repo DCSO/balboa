@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,6 +32,7 @@ const (
 // interface as described in https://www.circl.lu/services/passive-dns/.
 type RESTFrontend struct {
 	Server    *http.Server
+	Listener  net.Listener
 	IsRunning bool
 }
 
@@ -79,19 +81,19 @@ func (rh *restHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Run starts this instance of a RESTFrontend in the background, accepting
-// new requests on the configured port.
-func (g *RESTFrontend) Run(port int) {
+// RunWithListener starts this instance of a RESTFrontend in the background,
+// accepting new requests using the given net.Listener.
+func (g *RESTFrontend) RunWithListener(l net.Listener) {
 	handler := &restHandler{}
 	g.Server = &http.Server{
-		Addr:         fmt.Sprintf(":%v", port),
 		Handler:      handler,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
-	log.Infof("serving CIRCL-like REST on port %v", port)
+	g.Listener = l
+	log.Infof("serving CIRCL-like REST on %v", l.Addr().String())
 	go func() {
-		err := g.Server.ListenAndServe()
+		err := g.Server.Serve(l)
 		if err != nil {
 			log.Info(err)
 		}
@@ -99,9 +101,26 @@ func (g *RESTFrontend) Run(port int) {
 	}()
 }
 
+// GetAddr returns the address for this frontend's net.Listener.
+func (g *RESTFrontend) GetAddr() string {
+	return g.Listener.Addr().String()
+}
+
+// Run starts this instance of a RESTFrontend in the background, accepting
+// new requests on the configured port.
+func (g *RESTFrontend) Run(port int) {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Fatal(err)
+	}
+	g.Listener = listener
+	g.RunWithListener(listener)
+}
+
 // Stop causes this instance of a RESTFrontend to cease accepting requests.
 func (g *RESTFrontend) Stop() {
 	if g.IsRunning {
 		g.Server.Shutdown(context.TODO())
+		g.Listener.Close()
 	}
 }

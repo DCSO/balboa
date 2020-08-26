@@ -6,6 +6,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"runtime"
 	"time"
@@ -195,6 +196,7 @@ const (
 // query interface for the database.
 type GraphQLFrontend struct {
 	Server    *http.Server
+	Listener  net.Listener
 	IsRunning bool
 }
 
@@ -395,24 +397,40 @@ func (r *EntryResolver) Aliases(args struct{ Limit int32 }) *[]*EntryResolver {
 	return &l
 }
 
-// Run starts this instance of a GraphQLFrontend in the background, accepting
-// new requests on the configured port.
-func (g *GraphQLFrontend) Run(port int) {
+// GetAddr returns the address for this frontend's net.Listener.
+func (g *GraphQLFrontend) GetAddr() string {
+	return g.Listener.Addr().String()
+}
+
+// RunWithListener starts this instance of a GraphQLFrontend in the background,
+// accepting new requests using the given net.Listener.
+func (g *GraphQLFrontend) RunWithListener(l net.Listener) {
 	schema := graphql.MustParseSchema(txtSchema, &Resolver{})
 	g.Server = &http.Server{
-		Addr:         fmt.Sprintf(":%v", port),
 		Handler:      &relay.Handler{Schema: schema},
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
-	log.Infof("serving GraphQL on port %v", port)
+	g.Listener = l
+	log.Infof("serving GraphQL on %v", l.Addr().String())
 	go func() {
-		err := g.Server.ListenAndServe()
+		err := g.Server.Serve(l)
 		if err != nil {
 			log.Info(err)
 		}
 		g.IsRunning = true
 	}()
+}
+
+// Run starts this instance of a GraphQLFrontend in the background, accepting
+// new requests on the configured port.
+func (g *GraphQLFrontend) Run(port int) {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Fatal(err)
+	}
+	g.Listener = listener
+	g.RunWithListener(listener)
 }
 
 // Stop causes this instance of a GraphQLFrontend to cease accepting requests.
