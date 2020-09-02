@@ -1,10 +1,9 @@
 // balboa
-// Copyright (c) 2018, DCSO GmbH
+// Copyright (c) 2018, 2020, DCSO GmbH
 
 package cmds
 
 import (
-	"github.com/DCSO/balboa/selector"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -15,6 +14,8 @@ import (
 	"github.com/DCSO/balboa/feeder"
 	"github.com/DCSO/balboa/observation"
 	"github.com/DCSO/balboa/query"
+	"github.com/DCSO/balboa/selector"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -152,7 +153,7 @@ answering queries.`,
 			selectorEngine.ConsumeFeed(observation.InChan)
 		}
 
-		// start query server
+		// start GraphQL query server
 		var port int
 		port, err = cmd.Flags().GetInt("port")
 		if err != nil {
@@ -160,6 +161,18 @@ answering queries.`,
 		}
 		gql := query.GraphQLFrontend{}
 		gql.Run(int(port))
+
+		// start REST query server
+		var rport int
+		rport, err = cmd.Flags().GetInt("rest-port")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if rport != 0 {
+			rq := query.RESTFrontend{}
+			rq.Run(int(rport))
+		}
+
 		sigChan := make(chan os.Signal, 1)
 		done := make(chan bool, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -185,6 +198,7 @@ func init() {
 	serveCmd.Flags().StringP("feeders", "f", "feeders.yaml", "feeders configuration file")
 	serveCmd.Flags().StringP("selectors", "s", "selectors.yaml", "selectors configuration file")
 	serveCmd.Flags().IntP("port", "p", 8080, "port for GraphQL server")
+	serveCmd.Flags().IntP("rest-port", "r", 8088, "port for REST server")
 	serveCmd.Flags().StringP("logfile", "l", "/var/log/balboa.log", "log file path")
 	serveCmd.Flags().BoolP("logjson", "j", true, "output log file as JSON")
 	serveCmd.Flags().StringP("backend", "b", "backend.yaml", "backend configuration file")
