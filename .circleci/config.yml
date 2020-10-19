@@ -5,17 +5,14 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/golang:1.10-stretch
+      - image: circleci/golang:1.14-buster
 
     working_directory: /go/src/github.com/DCSO/balboa
     steps:
       - checkout
       - run:
-          name: Add stretch-backports
-          command: 'echo "deb http://ftp.debian.org/debian stretch-backports main" | sudo tee -a /etc/apt/sources.list.d/backports.list'
-      - run:
           name: Install apt dependencies
-          command: 'sudo apt-get update && sudo apt-get -t stretch-backports install librocksdb-dev -y'
+          command: 'sudo apt-get update && sudo apt-get install librocksdb-dev -y'
 
       # specify any bash command here prefixed with `run: `
       - run: go get -v -t -d ./...
