@@ -65,15 +65,16 @@ type Decoder struct {
 	inner_dec *codec.Decoder
 }
 
+// Release is a no-op.
+//
+// Deprecated: Release is now a no-op in the codec package.
 func (enc *Encoder) Release() {
-	enc.enc.Release()
 }
 
 func MakeEncoder() *Encoder {
 	inner := new(bytes.Buffer)
 	outer := new(bytes.Buffer)
 	h := new(codec.MsgpackHandle)
-	h.ExplicitRelease = true
 	h.WriteExt = true
 	enc := codec.NewEncoder(inner, h)
 	return &Encoder{inner: inner, outer: outer, enc: enc}
@@ -81,19 +82,18 @@ func MakeEncoder() *Encoder {
 
 func MakeDecoder(conn net.Conn) *Decoder {
 	outer_h := new(codec.MsgpackHandle)
-	outer_h.ExplicitRelease = true
 	outer_h.WriteExt = true
 	outer_dec := codec.NewDecoder(conn, outer_h)
 	inner_h := new(codec.MsgpackHandle)
-	inner_h.ExplicitRelease = true
 	inner_h.WriteExt = true
 	inner_dec := codec.NewDecoder(new(bytes.Buffer), inner_h)
 	return &Decoder{inner_dec: inner_dec, outer_dec: outer_dec, conn: conn}
 }
 
+// Release is a no-op.
+//
+// Deprecated: Release is now a no-op in the codec package.
 func (dec *Decoder) Release() {
-	dec.inner_dec.Release()
-	dec.outer_dec.Release()
 }
 
 func (dec *Decoder) ExpectQueryResponse() (*QueryResponse, error) {
