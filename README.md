@@ -65,7 +65,7 @@ This will create a binary executable in the `build/` subdirectories of each back
 - Go 1.10 or later
 - For the bundled RocksDB backend: [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
 
-On Debian (testing and stretch-backports), one can satisfy these dependencies with:
+On Debian, for example, one can satisfy these dependencies with:
 
 ```text
 % apt install golang-go librocksdb-dev
