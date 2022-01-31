@@ -1,0 +1,35 @@
+---
+name: balboa build
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  build:
+    name: "balboa"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+
+    - name: Install non-Go deps
+      run: |
+             sudo apt update
+             sudo apt -yq install librocksdb-dev
+
+    - name: Get and build deps
+      run: go get -v -t -d ./...
+
+    - name: Build executable
+      run: go build -v -o fever cmd/balboa/main.go
+
+    - name: Run tests
+      run: go test -v ./...
+
+    - name: Build backends
+      run: make -C backend

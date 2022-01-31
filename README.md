@@ -1,6 +1,6 @@
 # 📑 balboa
 
-[![CircleCI](https://circleci.com/gh/DCSO/balboa.svg?style=svg)](https://circleci.com/gh/DCSO/balboa)
+![Build Status](https://github.com/DCSO/balboa/actions/workflows/go.yml/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DCSO/balboa)](https://goreportcard.com/report/github.com/DCSO/balboa)
 
 
