@@ -289,7 +289,7 @@ Use the `time_first_rfc3339` and `time_last_rfc3339` instead of `time_first`
 and `time_last`, respectively, to get human-readable timestamps.
 
 When multiple backends are configured a query will be dispatched to every backend.
-Accordingly when an observation is stored in multiple backends the result to the query
+Accordingly, when an observation is stored in multiple backends, the result to the query
 will contain duplicates.
 
 ### Aliases
@@ -367,7 +367,7 @@ queries on the server side as well in the future.
 Run `balboa` without arguments to list available subcommands and get a short
 description of what they do.
 
-See also `README.md` in the `backends` directory.
+See also `README.md` in the `backend` directory.
 
 ## Author/Contact
 
