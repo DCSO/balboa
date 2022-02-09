@@ -1,6 +1,6 @@
 # 📑 balboa
 
-[![CircleCI](https://circleci.com/gh/DCSO/balboa.svg?style=svg)](https://circleci.com/gh/DCSO/balboa)
+![Build Status](https://github.com/DCSO/balboa/actions/workflows/go.yml/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DCSO/balboa)](https://goreportcard.com/report/github.com/DCSO/balboa)
 
 
@@ -65,7 +65,7 @@ This will create a binary executable in the `build/` subdirectories of each back
 - Go 1.10 or later
 - For the bundled RocksDB backend: [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
 
-On Debian (testing and stretch-backports), one can satisfy these dependencies with:
+On Debian, for example, one can satisfy these dependencies with:
 
 ```text
 % apt install golang-go librocksdb-dev
@@ -289,7 +289,7 @@ Use the `time_first_rfc3339` and `time_last_rfc3339` instead of `time_first`
 and `time_last`, respectively, to get human-readable timestamps.
 
 When multiple backends are configured a query will be dispatched to every backend.
-Accordingly when an observation is stored in multiple backends the result to the query
+Accordingly, when an observation is stored in multiple backends, the result to the query
 will contain duplicates.
 
 ### Aliases
@@ -367,7 +367,7 @@ queries on the server side as well in the future.
 Run `balboa` without arguments to list available subcommands and get a short
 description of what they do.
 
-See also `README.md` in the `backends` directory.
+See also `README.md` in the `backend` directory.
 
 ## Author/Contact
 
