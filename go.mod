@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/NeowayLabs/wabbit v0.0.0-20210927194032-73ad61d1620e
-	github.com/containerd/containerd v1.6.0 // indirect
+	github.com/containerd/containerd v1.6.18 // indirect
 	github.com/farsightsec/go-nmsg v0.2.0
 	github.com/fsouza/go-dockerclient v1.7.8 // indirect
 	github.com/gogo/protobuf v1.3.2
@@ -26,7 +26,6 @@ require (
 	github.com/tiago4orion/conjure v0.0.0-20150908101743-93cb30b9d218 // indirect
 	github.com/ugorji/go/codec v1.2.6
 	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 )
