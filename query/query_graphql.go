@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/DCSO/balboa/db"
@@ -176,7 +177,7 @@ const (
 		# Providing rdata, rrname, rrtype and/or sensor_id will restrict the
 		# results to the set of observations that match all of the given
 		# constraints.
-		entries(rdata: String, rrname: String, rrtype: RRType, sensor_id: String, limit: Int = 1000): [Entry]
+		entries(rdata: String, rrname: String, rrtype: RRType, sensor_id: [String], limit: Int = 1000): [Entry]
 
 		# Returns some runtime values describing the current state of the database.
 		stats(): Stats
@@ -209,7 +210,7 @@ func (r *Resolver) Entries(args struct {
 	Rdata    *string
 	Rrname   *string
 	Rrtype   *string
-	SensorID *string
+	SensorID *[]*string
 	Limit    int32
 }) (*[]*EntryResolver, error) {
 	startTime := time.Now()
@@ -231,7 +232,11 @@ func (r *Resolver) Entries(args struct {
 			rrtype = "nil"
 		}
 		if args.SensorID != nil {
-			sensorID = *args.SensorID
+			sensorIDs := make([]string, 0)
+			for _, sid := range *args.SensorID {
+				sensorIDs = append(sensorIDs, *sid)
+			}
+			sensorID = strings.Join(sensorIDs, ",")
 		} else {
 			sensorID = "nil"
 		}
@@ -244,15 +249,35 @@ func (r *Resolver) Entries(args struct {
 			Message: "at least one of the 'rdata' or 'rrname' parameters is required",
 		}
 	}
-	results, err := db.ObservationDB.Search(args.Rdata, args.Rrname, args.Rrtype, args.SensorID, int(args.Limit))
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range results {
-		er := EntryResolver{
-			entry: r,
+	if args.SensorID == nil {
+		results, err := db.ObservationDB.Search(args.Rdata, args.Rrname, args.Rrtype, nil, int(args.Limit))
+		if err != nil {
+			return nil, err
 		}
-		l = append(l, &er)
+		for _, r := range results {
+			er := EntryResolver{
+				entry: r,
+			}
+			l = append(l, &er)
+		}
+	} else {
+		lim := int(args.Limit)
+		for _, sid := range *args.SensorID {
+			if lim < 1 {
+				break
+			}
+			results, err := db.ObservationDB.Search(args.Rdata, args.Rrname, args.Rrtype, sid, lim)
+			if err != nil {
+				return nil, err
+			}
+			for _, r := range results {
+				er := EntryResolver{
+					entry: r,
+				}
+				lim--
+				l = append(l, &er)
+			}
+		}
 	}
 	return &l, nil
 }
