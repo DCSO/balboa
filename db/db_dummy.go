@@ -1,5 +1,5 @@
 // balboa
-// Copyright (c) 2020, DCSO GmbH
+// Copyright (c) 2020, 2025, DCSO GmbH
 
 package db
 
@@ -53,12 +53,48 @@ func (m *MockDB) Search(qrdata, qrrname, qrrtype, qsensorID *string, limit int) 
 	for _, o := range m.obs {
 		if qrdata != nil {
 			if *qrdata == o.RData {
-				retObs = append(retObs, o)
+				if qsensorID != nil {
+					if *qsensorID == o.SensorID {
+						if qrrtype != nil {
+							if *qrrtype == o.RRType {
+								retObs = append(retObs, o)
+							}
+						} else {
+							retObs = append(retObs, o)
+						}
+					}
+				} else {
+					if qrrtype != nil {
+						if *qrrtype == o.RRType {
+							retObs = append(retObs, o)
+						}
+					} else {
+						retObs = append(retObs, o)
+					}
+				}
 			}
 		}
 		if qrrname != nil {
 			if *qrrname == o.RRName {
-				retObs = append(retObs, o)
+				if qsensorID != nil {
+					if *qsensorID == o.SensorID {
+						if qrrtype != nil {
+							if *qrrtype == o.RRType {
+								retObs = append(retObs, o)
+							}
+						} else {
+							retObs = append(retObs, o)
+						}
+					}
+				} else {
+					if qrrtype != nil {
+						if *qrrtype == o.RRType {
+							retObs = append(retObs, o)
+						}
+					} else {
+						retObs = append(retObs, o)
+					}
+				}
 			}
 		}
 	}
