@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import datetime
 import random
 import string
@@ -138,7 +138,7 @@ def format(date, utc=False, use_system_timezone=True):
 
 def string2numeric_hash(text):
     import hashlib
-    return int(hashlib.md5(text).hexdigest()[:8], 16)
+    return int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
 
 entry = {}
 entry["dns"] = {}
