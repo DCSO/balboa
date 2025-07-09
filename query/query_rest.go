@@ -81,8 +81,9 @@ func parseParams(r *http.Request) (uint64, uint64, *string, []*string) {
 		slices.Sort(ids)
 		for _, val := range slices.Compact(ids) {
 			if len(val) > 0 {
-				//] skip empty sensor IDs
-				sensorIDs = append(sensorIDs, &val)
+				// skip empty sensor IDs
+				v := val
+				sensorIDs = append(sensorIDs, &v)
 			}
 		}
 	}
