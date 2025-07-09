@@ -1,5 +1,5 @@
 // balboa
-// Copyright (c) 2020, DCSO GmbH
+// Copyright (c) 2020, 2025, DCSO GmbH
 
 package query
 
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,9 @@ const (
 	// defaultLimit specifies the default limit to use if not given as a GET
 	// parameter.
 	defaultLimit = 1000
+	// defaultOffset specifies the default offset to use if not given as a GET
+	// parameter.
+	defaultOffset = 0
 	// queryPathPrefix specifies the HTTP GET path prefix before the actual
 	// search subject string.
 	queryPathPrefix = "/pdns/query/"
@@ -38,6 +42,54 @@ type RESTFrontend struct {
 
 type restHandler struct{}
 
+func limitSlice(slice []observation.Observation, limit, offset uint64) []observation.Observation {
+	if uint64(len(slice)) >= offset {
+		start := offset
+		end := min(uint64(len(slice)), offset+limit)
+		return slice[start:end]
+	}
+	return nil
+}
+
+func parseParams(r *http.Request) (uint64, uint64, *string, []*string) {
+	var limit uint64 = defaultLimit
+	var offset uint64 = defaultOffset
+	var rrtype *string = nil
+	var sensorIDs []*string = []*string{}
+	limParams, ok := r.URL.Query()["limit"]
+	if ok && len(limParams[0]) > 0 {
+		limVal, err := strconv.ParseUint(limParams[0], 10, 32)
+		if err == nil {
+			limit = limVal
+		}
+	}
+	offParams, ok := r.URL.Query()["next"]
+	if ok && len(offParams[0]) > 0 {
+		offVal, err := strconv.ParseUint(offParams[0], 10, 32)
+		if err == nil {
+			offset = offVal
+		}
+	}
+	rrtypeParams, ok := r.URL.Query()["rrtype"]
+	if ok && len(rrtypeParams[0]) > 0 {
+		rrtype = &rrtypeParams[0]
+	}
+	sensorIDParams, ok := r.URL.Query()["sensorids"]
+	if ok && len(sensorIDParams[0]) > 0 {
+		ids := strings.Split(sensorIDParams[0], ",")
+		// deduplicate sensor IDs
+		slices.Sort(ids)
+		for _, val := range slices.Compact(ids) {
+			if len(val) > 0 {
+				// skip empty sensor IDs
+				v := val
+				sensorIDs = append(sensorIDs, &v)
+			}
+		}
+	}
+	return limit, offset, rrtype, sensorIDs
+}
+
 func (rh *restHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, queryPathPrefix) {
 		w.WriteHeader(404)
@@ -45,33 +97,47 @@ func (rh *restHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	subject := strings.Replace(r.URL.Path, queryPathPrefix, "", -1)
 	allres := make([]observation.Observation, 0)
+	limit, offset, rrtype, sensorIDs := parseParams(r)
 
-	var limit int64 = defaultLimit
-	limParams, ok := r.URL.Query()["limit"]
-	if ok && len(limParams[0]) == 1 {
-		limVal, err := strconv.ParseInt(limParams[0], 10, 32)
-		if err == nil {
-			limit = limVal
+	if len(sensorIDs) == 0 {
+		results, err := db.ObservationDB.Search(nil, &subject, rrtype, nil, int(limit+offset))
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		allres = append(allres, results...)
+		results, err = db.ObservationDB.Search(&subject, nil, rrtype, nil, int(limit+offset))
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		allres = append(allres, results...)
+	} else {
+		for _, sensorID := range sensorIDs {
+			results, err := db.ObservationDB.Search(nil, &subject, rrtype, sensorID, int(limit+offset))
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			allres = append(allres, results...)
+			results, err = db.ObservationDB.Search(&subject, nil, rrtype, sensorID, int(limit+offset))
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			allres = append(allres, results...)
+			if len(allres) >= int(limit+offset) {
+				// if we have enough results, stop searching
+				// to avoid unnecessary load on the database
+				break
+			}
 		}
 	}
-
-	results, err := db.ObservationDB.Search(nil, &subject, nil, nil, int(limit))
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	allres = append(allres, results...)
-	results, err = db.ObservationDB.Search(&subject, nil, nil, nil, int(limit))
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	allres = append(allres, results...)
-
 	if len(allres) == 0 {
 		w.WriteHeader(404)
 		return
 	}
+	allres = limitSlice(allres, limit, offset)
 	for _, rs := range allres {
 		json, err := json.Marshal(&rs)
 		if err == nil {
