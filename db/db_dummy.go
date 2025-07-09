@@ -51,50 +51,9 @@ func (m *MockDB) TotalCount() (int, error) {
 func (m *MockDB) Search(qrdata, qrrname, qrrtype, qsensorID *string, limit int) ([]observation.Observation, error) {
 	retObs := make([]observation.Observation, 0)
 	for _, o := range m.obs {
-		if qrdata != nil {
-			if *qrdata == o.RData {
-				if qsensorID != nil {
-					if *qsensorID == o.SensorID {
-						if qrrtype != nil {
-							if *qrrtype == o.RRType {
-								retObs = append(retObs, o)
-							}
-						} else {
-							retObs = append(retObs, o)
-						}
-					}
-				} else {
-					if qrrtype != nil {
-						if *qrrtype == o.RRType {
-							retObs = append(retObs, o)
-						}
-					} else {
-						retObs = append(retObs, o)
-					}
-				}
-			}
-		}
-		if qrrname != nil {
-			if *qrrname == o.RRName {
-				if qsensorID != nil {
-					if *qsensorID == o.SensorID {
-						if qrrtype != nil {
-							if *qrrtype == o.RRType {
-								retObs = append(retObs, o)
-							}
-						} else {
-							retObs = append(retObs, o)
-						}
-					}
-				} else {
-					if qrrtype != nil {
-						if *qrrtype == o.RRType {
-							retObs = append(retObs, o)
-						}
-					} else {
-						retObs = append(retObs, o)
-					}
-				}
+		if (qrdata == nil || *qrdata == o.RData) && (qrrname == nil || *qrrname == o.RRName) {
+			if (qsensorID == nil || *qsensorID == o.SensorID) && (qrrtype == nil || *qrrtype == o.RRType) {
+				retObs = append(retObs, o)
 			}
 		}
 	}
