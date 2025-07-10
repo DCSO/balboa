@@ -18,8 +18,8 @@ type InputObservation struct {
 	SensorID       string                   `codec:"I"`
 	TimestampEnd   time.Time                `codec:"L"`
 	TimestampStart time.Time                `codec:"F"`
-	Tags           map[string]struct{}      `codec:"G,omitempty"`
-	Selectors      map[interface{}]struct{} `codec:"S,omitempty"`
+	Tags           map[string]struct{}      `codec:"-,omitempty"`
+	Selectors      map[interface{}]struct{} `codec:"-,omitempty"`
 }
 
 // InChan is the global input channel delivering InputObservations from
