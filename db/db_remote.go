@@ -1,15 +1,15 @@
 // balboa
-// Copyright (c) 2019, DCSO GmbH
+// Copyright (c) 2019, 2025, DCSO GmbH
 
 package db
 
 import (
-	"gopkg.in/yaml.v2"
 	"net"
 
 	obs "github.com/DCSO/balboa/observation"
 
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 )
 
 type Backend struct {
@@ -109,8 +109,22 @@ func (db *RemoteBackend) ConsumeFeed(inChan chan obs.InputObservation) {
 					wanted := w.Len()
 					n, err := w.WriteTo(*conn)
 					if err != nil {
-						log.Warnf("sending observation failed: %s", err)
-						continue
+						log.Warnf("sending observation failed: %s, reconnecting", err)
+						(*conn).Close()
+						// try to reconnect
+						newConn, err := net.Dial("tcp", (*conn).RemoteAddr().String())
+						if err != nil {
+							log.Warnf("reconnecting to backend failed: %s", err)
+							continue
+						}
+						*conn = newConn
+						// and try again
+						n, err = w.WriteTo(*conn)
+						if err != nil {
+							log.Warnf("retry sending observation failed: %s", err)
+							(*conn).Close()
+							continue
+						}
 					}
 					if n != int64(wanted) {
 						log.Warnf("short write")
