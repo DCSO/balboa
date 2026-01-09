@@ -1,5 +1,5 @@
 // balboa
-// Copyright (c) 2018, 2019 DCSO GmbH
+// Copyright (c) 2018, 2026 DCSO GmbH
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -467,6 +467,10 @@ static int blb_rocksdb_query_by_i(
     keys_visited += 1;
     size_t key_len = 0;
     const char* key = rocksdb_iter_key(it, &key_len);
+    if(key_len < prefix_len
+       || memcmp(key, dbc->scrtch_inv, prefix_len) != 0) {
+      break;
+    }
     char* err = NULL;
 
     enum TokIdx { RDATA = 3, SENSORID = 2, RRNAME = 1, RRTYPE = 0, FIELDS = 4 };
