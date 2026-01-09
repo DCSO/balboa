@@ -1,5 +1,5 @@
 // balboa
-// Copyright (c) 2019, 2020, DCSO GmbH
+// Copyright (c) 2019, 2026, DCSO GmbH
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -177,6 +177,7 @@ static int main_query(int argc, char** argv) {
     case 'v': trace_config.verbosity += 1; break;
     case 'h': engine_config.host = opt.arg; break;
     case 'p': engine_config.port = atoi(opt.arg); break;
+    case 'l': query->limit = atoi(opt.arg); break;
     case 'd':
       if(opt.arg == NULL) {
         L(log_emergency("string for option `-d` required"));
@@ -364,6 +365,17 @@ Command dump:\n\
     -p <port> port of the `balboa-backend` (default: 4242)\n\
     -v increase verbosity; can be passed multiple times\n\
     -d <remote-dump-path> unused/ignored (default: -)\n\
+\n\
+Command query:\n\
+    execute a query against the database\n\
+\n\
+    -h <host> ip address of the `balboa-backend` (default: 127.0.0.1)\n\
+    -p <port> port of the `balboa-backend` (default: 4242)\n\
+    -r <rrname> rrname to query for\n\
+    -d <rdata> rdata to query for\n\
+    -s <sensorid> sensorid to filter by\n\
+    -l <limit> maximum number of results (default: 100)\n\
+    -v increase verbosity; can be passed multiple times\n\
 \n\
 Command replay:\n\
     replay a previously generated database dump\n\
