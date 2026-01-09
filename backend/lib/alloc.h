@@ -1,5 +1,5 @@
 // balboa
-// Copyright (c) 2018, 2019 DCSO GmbH
+// Copyright (c) 2018, 2026 DCSO GmbH
 
 #ifndef __ALLOC_H
 #define __ALLOC_H
@@ -10,8 +10,10 @@
 
 static inline void* blb_realloc_impl(
     const char* name, void* p, size_t new_size) {
+  uintptr_t old_addr = (uintptr_t)p;
   void* pp = realloc(p, new_size);
-  X(log_debug("(%s) realloc `%p` `%p` `%zu`", name, p, pp, new_size));
+  X(log_debug(
+      "(%s) realloc `0x%" PRIxPTR "` `%p` `%zu`", name, old_addr, pp, new_size));
   return (pp);
 }
 
@@ -32,8 +34,9 @@ static inline void* blb_realloc_impl(
 #define blb_realloc(p, sz)                                \
   ({                                                      \
     size_t p_sz = (sz);                                   \
+    uintptr_t old_addr = (uintptr_t)(p);                  \
     void* pp = realloc((p), p_sz);                        \
-    X(log_debug("realloc `%p` `%zu` `%p`", pp, p_sz, p)); \
+    X(log_debug("realloc `0x%" PRIxPTR "` `%zu` `%p`", old_addr, p_sz, pp)); \
     pp;                                                   \
   })
 #define blb_free(p)                 \
