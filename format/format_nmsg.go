@@ -2,8 +2,10 @@ package format
 
 import (
 	"fmt"
-	"github.com/DCSO/balboa/observation"
+	"net"
 	"time"
+
+	"github.com/DCSO/balboa/observation"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -70,7 +72,13 @@ func parseRData(rdata []byte, rrtype int) string {
 			// expecting exactly 4 byte
 			return "" // corrupt record
 		}
-		return fmt.Sprintf("%d.%d.%d.%d", rdata[0], rdata[1], rdata[2], rdata[3])
+		// DNS A records are in network byte order (big endian)
+		// Convert to net.IP for consistent handling across architectures
+		ip := net.IP(rdata).To4()
+		if ip == nil {
+			return ""
+		}
+		return ip.String()
 	case RRT_NS, RRT_CNAME, RRT_MX:
 		return parseDomainString(rdata)
 	default:
