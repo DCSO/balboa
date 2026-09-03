@@ -44,7 +44,7 @@ require (
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rabbitmq/amqp091-go v1.3.0 // indirect
+	github.com/rabbitmq/amqp091-go v1.13.0 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
