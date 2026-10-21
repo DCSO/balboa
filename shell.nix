@@ -6,5 +6,5 @@ in
     shellHook = ''
        export GOPATH=${toString ./.}/go
     '';
-    buildInputs = with pkgs; [ git go go2nix ];
+    buildInputs = with pkgs; [ git go go2nix pkg-config zeromq ];
   }

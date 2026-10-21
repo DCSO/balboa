@@ -62,13 +62,14 @@ This will create a binary executable in the `build/` subdirectories of each back
 
 ### Dependencies
 
-- Go 1.10 or later
+- Go 1.25 or later, with cgo enabled
+- [ZeroMQ](https://zeromq.org/) (libzmq, required by the NMSG input via go-nmsg)
 - For the bundled RocksDB backend: [RocksDB](https://rocksdb.org/) 5.0 or later (shared lib, with LZ4 support)
 
 On Debian, for example, one can satisfy these dependencies with:
 
 ```text
-% apt install golang-go librocksdb-dev
+% apt install golang-go librocksdb-dev libzmq3-dev pkg-config
 ...
 ```
 
