@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/NeowayLabs/wabbit v0.0.0-20210927194032-73ad61d1620e
-	github.com/farsightsec/go-nmsg v0.2.0
+	github.com/farsightsec/go-nmsg v0.4.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.4
 	github.com/graph-gophers/graphql-go v1.3.0
@@ -28,7 +28,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fsouza/go-dockerclient v1.7.8 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
@@ -42,6 +41,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pborman/uuid v1.2.0 // indirect
+	github.com/pebbe/zmq4 v1.4.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rabbitmq/amqp091-go v1.14.0 // indirect
@@ -54,9 +54,9 @@ require (
 	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tiago4orion/conjure v0.0.0-20150908101743-93cb30b9d218 // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
-	google.golang.org/protobuf v1.35.2 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
 )

@@ -20,7 +20,7 @@ jobs:
     - name: Install non-Go deps
       run: |
              sudo apt update
-             sudo apt -yq install librocksdb-dev
+             sudo apt -yq install librocksdb-dev libzmq3-dev pkg-config
 
     - name: Get and build deps
       run: go get -v -t -d ./...

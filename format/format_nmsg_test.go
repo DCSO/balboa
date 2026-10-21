@@ -2,10 +2,16 @@ package format
 
 import (
 	"bytes"
+	"compress/zlib"
+	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"github.com/DCSO/balboa/observation"
 	"github.com/farsightsec/go-nmsg"
+	"github.com/gogo/protobuf/proto"
 	"github.com/sirupsen/logrus/hooks/test"
+	"io"
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -111,5 +117,230 @@ func TestNmsgFormat(t *testing.T) {
 	}
 	if len(hook.Entries) != 0 {
 		t.Fail()
+	}
+}
+
+// nmsgOkPayloads decodes the reference capture into its individual payloads.
+func nmsgOkPayloads(t *testing.T) []*nmsg.NmsgPayload {
+	t.Helper()
+	dst, err := hex.DecodeString(nmsg_ok)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payloads := make([]*nmsg.NmsgPayload, 0)
+	input := nmsg.NewInput(bytes.NewReader(dst), 1480)
+	for {
+		payload, err := input.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		payloads = append(payloads, payload)
+	}
+	return payloads
+}
+
+// encodeNmsg writes the given payloads into NMSG containers using the
+// supplied container settings.
+func encodeNmsg(t *testing.T, payloads []*nmsg.NmsgPayload, compress bool, size, writeSize int) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	output := nmsg.BufferedOutput(&buf)
+	output.SetCompression(compress)
+	output.SetMaxSize(size, writeSize)
+	for _, p := range payloads {
+		if err := output.Send(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := output.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// decodeNmsgObservations reads all containers from data and returns the
+// observations derived from their payloads.
+func decodeNmsgObservations(t *testing.T, data []byte) []observation.InputObservation {
+	t.Helper()
+	resChan := make(chan observation.InputObservation, 1000)
+	stopChan := make(chan bool)
+	defer close(stopChan)
+
+	input := nmsg.NewInput(bytes.NewReader(data), nmsg.MaxContainerSize)
+	for {
+		payload, err := input.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = MakeNmsgInputObservations(payload.GetPayload(), "foo", resChan, stopChan)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	close(resChan)
+
+	resultObs := make([]observation.InputObservation, 0)
+	for o := range resChan {
+		resultObs = append(resultObs, o)
+	}
+	return resultObs
+}
+
+// skipCompressedFragments skips tests that read compressed, fragmented
+// containers. go-nmsg (up to at least v0.4.0) tries to inflate each fragment
+// on its own instead of inflating the reassembled container, so such input
+// cannot be decoded.
+func skipCompressedFragments(t *testing.T) {
+	t.Helper()
+	t.Skip("go-nmsg cannot decode compressed fragmented containers")
+}
+
+func compareNmsgObservations(t *testing.T, resultObs, reference []observation.InputObservation) {
+	t.Helper()
+	if len(resultObs) != len(reference) {
+		t.Fatalf("expected %d observations, got %d", len(reference), len(resultObs))
+	}
+	for i := range reference {
+		if resultObs[i].Rrname != reference[i].Rrname ||
+			resultObs[i].Rrtype != reference[i].Rrtype ||
+			resultObs[i].Rdata != reference[i].Rdata ||
+			!resultObs[i].TimestampStart.Equal(reference[i].TimestampStart) {
+			t.Fatalf("observation %d differs: %v != %v", i, resultObs[i], reference[i])
+		}
+	}
+}
+
+func TestNmsgFormatContainerVariants(t *testing.T) {
+	payloads := nmsgOkPayloads(t)
+	if len(payloads) != 100 {
+		t.Fatalf("expected 100 payloads in reference data, got %d", len(payloads))
+	}
+	reference := decodeNmsgObservations(t, encodeNmsg(t, payloads, false, nmsg.MaxContainerSize, 0))
+	if len(reference) != 100 {
+		t.Fatalf("expected 100 observations, got %d", len(reference))
+	}
+
+	t.Run("compressed", func(t *testing.T) {
+		data := encodeNmsg(t, payloads, true, nmsg.MaxContainerSize, 0)
+		compareNmsgObservations(t, decodeNmsgObservations(t, data), reference)
+	})
+	t.Run("small containers", func(t *testing.T) {
+		data := encodeNmsg(t, payloads, false, nmsg.EtherContainerSize, 0)
+		compareNmsgObservations(t, decodeNmsgObservations(t, data), reference)
+	})
+	t.Run("small compressed containers", func(t *testing.T) {
+		// containers are filled assuming a compression ratio of 2, which
+		// this data does not reach, so some of them end up fragmented
+		skipCompressedFragments(t)
+		data := encodeNmsg(t, payloads, true, nmsg.EtherContainerSize, 0)
+		compareNmsgObservations(t, decodeNmsgObservations(t, data), reference)
+	})
+}
+
+// makeNmsgPayload wraps a NewDomain message into an SIE NMSG payload.
+func makeNmsgPayload(t *testing.T, nd *NewDomain) *nmsg.NmsgPayload {
+	t.Helper()
+	b, err := proto.Marshal(nd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vid, msgtype := uint32(2), uint32(5)
+	sec, nsec := int64(1500000000), uint32(0)
+	return &nmsg.NmsgPayload{
+		Vid:      &vid,
+		Msgtype:  &msgtype,
+		TimeSec:  &sec,
+		TimeNsec: &nsec,
+		Payload:  b,
+	}
+}
+
+func TestNmsgFormatFragmented(t *testing.T) {
+	// a TXT record that does not fit into a single Ethernet-sized container
+	rdata := make([]byte, 8*nmsg.EtherContainerSize)
+	_, _ = rand.New(rand.NewSource(42)).Read(rdata)
+	for i := range rdata {
+		rdata[i] = 'a' + rdata[i]%26
+	}
+	rrtype, timeSeen := uint32(RRT_TXT), uint32(1500000000)
+	payload := makeNmsgPayload(t, &NewDomain{
+		Rrname:   []byte("\x07example\x03com\x00"),
+		Rrtype:   &rrtype,
+		Rdata:    [][]byte{rdata},
+		TimeSeen: &timeSeen,
+	})
+
+	for _, compress := range []bool{false, true} {
+		t.Run(fmt.Sprintf("compressed=%v", compress), func(t *testing.T) {
+			if compress {
+				skipCompressedFragments(t)
+			}
+			data := encodeNmsg(t, []*nmsg.NmsgPayload{payload}, compress, nmsg.EtherContainerSize, 0)
+			if len(data) < 2*nmsg.EtherContainerSize {
+				t.Fatalf("expected fragmented output, got %d bytes", len(data))
+			}
+			resultObs := decodeNmsgObservations(t, data)
+			if len(resultObs) != 1 {
+				t.Fatalf("expected 1 observation, got %d", len(resultObs))
+			}
+			o := resultObs[0]
+			if o.Rrname != "example.com" || o.Rrtype != "TXT" || o.Rdata != string(rdata) ||
+				o.TimestampStart.Unix() != int64(timeSeen) {
+				t.Fatalf("unexpected observation: %s %s %d", o.Rrname, o.Rrtype, o.TimestampStart.Unix())
+			}
+		})
+	}
+}
+
+// nmsgContainerHeader builds a raw NMSG container header.
+func nmsgContainerHeader(flags byte, length uint32) []byte {
+	h := []byte{'N', 'M', 'S', 'G', flags, 2, 0, 0, 0, 0}
+	binary.BigEndian.PutUint32(h[6:], length)
+	return h
+}
+
+func TestNmsgInputRejectsOversizedContainer(t *testing.T) {
+	data := nmsgContainerHeader(0, nmsg.MaxContainerSize+1)
+	input := nmsg.NewInput(bytes.NewReader(data), 1480)
+	_, err := input.Recv()
+	if err == nil || err == io.EOF {
+		t.Fatalf("expected error for oversized container, got %v", err)
+	}
+}
+
+func TestNmsgInputRejectsOversizedCompressedBuffer(t *testing.T) {
+	// zlib-compressed container whose zbuf header announces an inflated
+	// size beyond the maximum container size
+	var zbuf bytes.Buffer
+	_ = binary.Write(&zbuf, binary.BigEndian, uint32(nmsg.MaxContainerSize+1))
+	w := zlib.NewWriter(&zbuf)
+	_, _ = w.Write(make([]byte, 64))
+	_ = w.Close()
+
+	data := append(nmsgContainerHeader(1, uint32(zbuf.Len())), zbuf.Bytes()...)
+	input := nmsg.NewInput(bytes.NewReader(data), 1480)
+	_, err := input.Recv()
+	if !nmsg.IsDataError(err) {
+		t.Fatalf("expected data error for oversized compressed buffer, got %v", err)
+	}
+}
+
+func TestNmsgInputChecksumMismatch(t *testing.T) {
+	payloads := nmsgOkPayloads(t)
+	data := encodeNmsg(t, payloads[:1], false, nmsg.MaxContainerSize, 0)
+	// flip a bit in the last byte of the payload CRC field, which is the
+	// final field of the container
+	data[len(data)-1] ^= 0x01
+
+	input := nmsg.NewInput(bytes.NewReader(data), 1480)
+	_, err := input.Recv()
+	if !nmsg.IsDataError(err) {
+		t.Fatalf("expected data error for checksum mismatch, got %v", err)
 	}
 }
